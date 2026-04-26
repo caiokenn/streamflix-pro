@@ -4,6 +4,8 @@ import { useAuth } from './AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { saveProgress as supabaseSaveProgress } from '@/lib/supabase';
 
+import { MediaType } from '@/lib/validation';
+
 interface WatchProgress {
   id: string;
   tmdb_id: number;
@@ -15,8 +17,8 @@ interface WatchProgress {
 
 interface ProgressContextType {
   progressMap: Record<string, WatchProgress>;
-  updateProgress: (tmdbId: number, mediaType: string, data: any) => Promise<void>;
-  removeProgress: (mediaType: string, tmdbId: number) => Promise<void>;
+  updateProgress: (tmdbId: number, mediaType: MediaType, data: any) => Promise<void>;
+  removeProgress: (mediaType: MediaType, tmdbId: number) => Promise<void>;
   refreshProgress: () => Promise<void>;
   loading: boolean;
 }
@@ -58,7 +60,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     fetchProgress();
   }, [fetchProgress]);
 
-  const updateProgress = useCallback(async (tmdbId: number, mediaType: string, data: any) => {
+  const updateProgress = useCallback(async (tmdbId: number, mediaType: MediaType, data: any) => {
     if (!profile?.id) return;
 
     // Atualização Otimista (UI primeiro)
@@ -80,7 +82,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
-  const removeProgress = async (mediaType: string, tmdbId: number) => {
+  const removeProgress = async (mediaType: MediaType, tmdbId: number) => {
     if (!profile) return;
     const key = `${mediaType}_${tmdbId}`;
     const supabase = createClient();
