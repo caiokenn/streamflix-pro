@@ -1,0 +1,303 @@
+﻿INDICE DETALHADO DE PROBLEMAS - STREAMFLIX
+=============================================
+
+Arquivo: INDICE_PROBLEMAS.txt
+Data: 22/04/2026
+
+================================================================================
+INDICE DE TODOS OS 19 PROBLEMAS
+================================================================================
+
+SEGURANCA (5)
+=============
+
+[1.1] API KEYS EXPOSTAS - lib/supabase.js, lib/tmdb.js
+      Severidade: CRITICO
+      Arquivo: lib/supabase.js (linha 5-6), lib/tmdb.js (linha 3-5)
+      Problema: process.env.NEXT_PUBLIC_TMDB_READ_TOKEN visible no client
+      Risco: Requisicoes diretas nao autorizadas a API
+      Solucao: Criar API routes como proxy
+      Tempo: 1-2 horas
+      Prioridade: 1
+
+[1.2] URL INJECTION - lib/tmdb.js
+      Severidade: CRITICO
+      Arquivo: lib/tmdb.js (linha 16)
+      Problema: const url = \\\?\\; sem validacao
+      Risco: XSS / Injection attack
+      Solucao: Usar URLSearchParams + validacao de endpoint
+      Tempo: 30 min
+      Prioridade: 2
+
+[1.3] LOCALSTORAGE SEM VALIDACAO - contexts/AuthContext.js
+      Severidade: ALTO
+      Arquivo: contexts/AuthContext.js (linha 44, 52, 57, 65)
+      Problema: localStorage.setItem('activeProfileId', p.id) sem validar
+      Risco: XSS via storage injection
+      Solucao: Validar UUID pattern antes de salvar
+      Tempo: 30 min
+      Prioridade: 3
+
+[1.4] VALIDACAO SENHA FRACA - components/Auth/AuthModal.js
+      Severidade: ALTO
+      Arquivo: components/Auth/AuthModal.js (linha 27-39)
+      Problema: Sem validacao de complexidade (maiuscula, numero, simbolo)
+      Risco: Senhas fracas aceitas
+      Solucao: Regex com requisitos: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@\$!%*?&])/
+      Tempo: 1 hora
+      Prioridade: 4
+
+[1.5] ERROR MESSAGES EXPÕEM DETALHES - components/Auth/AuthModal.js
+      Severidade: MEDIO
+      Arquivo: components/Auth/AuthModal.js (linha 39)
+      Problema: setError(err.message) mostra detalhes internos
+      Risco: Information disclosure
+      Solucao: Mapear para mensagens genéricas
+      Tempo: 30 min
+      Prioridade: 5
+
+ERROR HANDLING (7)
+==================
+
+[2.1] GETUSER SEM TRY-CATCH - lib/supabase.js
+      Severidade: ALTO
+      Arquivo: lib/supabase.js (linha 47-50)
+      Problema: const { data: { user } } pode lancar excecao nao capturada
+      Risco: Crash aleatorio
+      Solucao: try-catch com return null em erro
+      Tempo: 30 min
+      Prioridade: 6
+
+[2.2] GETSESSION SEM TRY-CATCH - lib/supabase.js
+      Severidade: ALTO
+      Arquivo: lib/supabase.js (linha 52-55)
+      Problema: Mesmo que 2.1
+      Risco: Estado inconsistente
+      Solucao: try-catch com return null em erro
+      Tempo: 30 min
+      Prioridade: 7
+
+[2.3] PROMISE.ALL SEM FALLBACK - components/ContinueWatching/ContinueWatching.js
+      Severidade: ALTO
+      Arquivo: components/ContinueWatching/ContinueWatching.js (linha 30)
+      Problema: Um item falhando quebra todo Promise.all
+      Risco: Pagina nao carrega
+      Solucao: Usar Promise.allSettled
+      Tempo: 1 hora
+      Prioridade: 8
+
+[2.4] LOADPROFILES SEM ERROR STATE - contexts/AuthContext.js
+      Severidade: ALTO
+      Arquivo: contexts/AuthContext.js (linha 39-48)
+      Problema: Falha silenciosa, nenhum estado de erro
+      Risco: Usuario sem feedback
+      Solucao: Adicionar error state, try-catch
+      Tempo: 1 hora
+      Prioridade: 9
+
+[2.5] PROFILESELECTOR SEM ERROR HANDLING - components/Profile/ProfileSelector.js
+      Severidade: ALTO
+      Arquivo: components/Profile/ProfileSelector.js (linha 11-19)
+      Problema: handleAddProfile sem try-catch ou feedback
+      Risco: Falha silenciosa ao criar perfil
+      Solucao: try-catch + error state + loading
+      Tempo: 1.5 horas
+      Prioridade: 10
+
+[2.6] NAVBAR SEARCH SEM VALIDACAO - components/Navbar/Navbar.js
+      Severidade: MEDIO
+      Arquivo: components/Navbar/Navbar.js (linha 51-57)
+      Problema: router.push sem try-catch, sem validacao
+      Risco: Falha silenciosa na navegacao
+      Solucao: async try-catch, validacao de query
+      Tempo: 1 hora
+      Prioridade: 11
+
+[2.7] TMDB FETCH SEM TIMEOUT - lib/tmdb.js
+      Severidade: MEDIO
+      Arquivo: lib/tmdb.js (linha 14-20)
+      Problema: Sem timeout, sem logging detalhado
+      Risco: Requisicao travada indefinidamente
+      Solucao: AbortSignal.timeout(10000), melhor logging
+      Tempo: 1 hora
+      Prioridade: 12
+
+PADROES INCONSISTENTES (4)
+===========================
+
+[3.1] NOMENCLATURA MISTA - Multiplos arquivos
+      Severidade: MEDIO
+      Problema:
+        - mediaType vs media_type
+        - tmdbId vs tmdb_id
+        - profile vs p
+        - userId vs user.id
+      Solucao: Padronizar camelCase em JS, snake_case no DB
+      Tempo: 2 horas
+      Prioridade: 13
+
+[3.2] DESTRUCTURING UNSAFE - lib/supabase.js
+      Severidade: MEDIO
+      Arquivo: lib/supabase.js (linha 48, 53)
+      Problema: const { data: { user } } sem verificar result.error
+      Solucao: Verificar error antes de destructuring
+      Tempo: 30 min
+      Prioridade: 14
+
+[3.3] STATE MANAGEMENT INCONSISTENTE - AuthModal vs StarRating
+      Severidade: MEDIO
+      Problema: Diferentes padroes de state em componentes
+      Solucao: Criar hook useAsyncForm reutilizavel
+      Tempo: 2 horas
+      Prioridade: 15
+
+[3.4] FALTA JSDOC - Todo projeto
+      Severidade: BAIXO
+      Problema: Sem documentacao de tipos em parametros
+      Solucao: Adicionar JSDoc em todas funcoes
+      Tempo: 3-4 horas
+      Prioridade: 16
+
+PERFORMANCE (2)
+===============
+
+[4.1] PROMISE.ALL SEM BATCHING - components/ContinueWatching/ContinueWatching.js
+      Severidade: MEDIO
+      Arquivo: components/ContinueWatching/ContinueWatching.js (linha 30)
+      Problema: Muitos getMovieDetails simultaneos, sem cache
+      Impacto: API sobrecarregada, pagina lenta
+      Solucao: Batching (max 5), cache via Supabase
+      Tempo: 2 horas
+      Prioridade: 17
+
+[4.2] SCROLL LISTENER SEM THROTTLE - components/Navbar/Navbar.js
+      Severidade: MEDIO
+      Arquivo: components/Navbar/Navbar.js (linha 32)
+      Problema: setScrolled() em cada pixel de scroll
+      Impacto: 60+ re-renders/segundo em 60fps
+      Solucao: Throttle (100-200ms) ou requestAnimationFrame
+      Tempo: 30 min
+      Prioridade: 18
+
+CODIGO DUPLICADO (3)
+====================
+
+[5.1] GENRE_MAP DUPLICADO - components/Hero/Hero.js
+      Severidade: BAIXO
+      Arquivo: components/Hero/Hero.js (linha 126-132)
+      Problema: Mapa hardcoded dentro do componente
+      Solucao: Mover para lib/constants.js e importar
+      Tempo: 30 min
+      Prioridade: 19
+
+[5.2] IMAGE URL HELPERS DUPLICADOS - lib/tmdb.js
+      Severidade: BAIXO
+      Arquivo: lib/tmdb.js (linha 23-36)
+      Problema: 3 funcoes com mesmo padrão (getPosterUrl, etc)
+      Solucao: Funcao generica getImageUrl(path, type, size)
+      Tempo: 1 hora
+      Prioridade: 20
+
+[5.3] ERROR MAPPING DUPLICADO - components/Auth/AuthModal.js
+      Severidade: BAIXO
+      Arquivo: components/Auth/AuthModal.js (linha 33)
+      Problema: Mapeamento de erros apenas neste arquivo
+      Solucao: Centralizar em lib/errors.js
+      Tempo: 30 min
+      Prioridade: 21
+
+================================================================================
+ORDEM DE PRIORIDADE RECOMENDADA
+================================================================================
+
+HOJE (Comeco imediato):
+  1. [1.1] API KEYS - Criar proxy
+  2. [1.2] URL INJECTION - Validar endpoint
+  3. [1.3] LOCALSTORAGE - Validar UUID
+
+SEMANA 1:
+  4. [1.4] SENHA FRACA - Regex validacao
+  5. [2.1] GETUSER - Try-catch
+  6. [2.2] GETSESSION - Try-catch
+  7. [1.5] ERROR MESSAGES - Mapear genericos
+  8. [2.3] PROMISE.ALL - Usar allSettled
+  9. [2.4] LOADPROFILES - Try-catch + error
+
+SEMANA 2:
+  10. [2.5] PROFILESELECTOR - Try-catch + states
+  11. [3.1] NOMENCLATURA - Padronizar
+  12. [4.1] BATCHING - Cache + batching
+  13. [2.6] NAVBAR - Validacao
+  14. [2.7] TMDB - Timeout + logging
+
+SEMANA 3:
+  15. [3.2] DESTRUCTURING - Safe check
+  16. [3.3] HOOKS - useAsyncForm
+  17. [4.2] THROTTLE - Scroll
+  18. [5.1] GENRE_MAP - Centralizar
+  19. [5.2] IMAGE - Refatorar
+  20. [5.3] ERRORS - Centralizar
+
+FUTURO:
+  21. [3.4] JSDOC - Documentacao
+
+================================================================================
+MATRIZ DE IMPACTO
+================================================================================
+
+ALTO IMPACTO + BAIXO ESFORCO (Comeco rapido):
+  - [1.3] LOCALSTORAGE (30 min)
+  - [2.1] GETUSER (30 min)
+  - [2.2] GETSESSION (30 min)
+  - [1.5] ERROR MSG (30 min)
+  - [4.2] THROTTLE (30 min)
+  - [5.1] GENRE (30 min)
+
+ALTO IMPACTO + MEDIO ESFORCO (Prioritario):
+  - [1.1] API KEYS (1-2 h)
+  - [1.2] URL INJECTION (30 min)
+  - [1.4] SENHA (1 h)
+  - [2.3] PROMISE.ALL (1 h)
+  - [2.4] LOADPROFILES (1 h)
+  - [2.5] PROFILESELECTOR (1.5 h)
+  - [4.1] BATCHING (2 h)
+
+MEDIO IMPACTO + BAJO ESFORCO:
+  - [2.6] NAVBAR (1 h)
+  - [2.7] TMDB (1 h)
+  - [3.2] DESTRUCTURING (30 min)
+  - [5.2] IMAGE (1 h)
+  - [5.3] ERRORS (30 min)
+
+MEDIO IMPACTO + ALTO ESFORCO:
+  - [3.1] NOMENCLATURA (2 h)
+  - [3.3] HOOKS (2 h)
+  - [3.4] JSDOC (3-4 h)
+
+================================================================================
+ESTIMATIVAS TOTAIS
+================================================================================
+
+CRITICO (5 problemas):
+  - Tempo: 6-8 horas
+  - Custo: Bajo
+  - Impacto: Elimina 80% dos riscos
+
+ALTO (7 problemas):
+  - Tempo: 8-10 horas
+  - Custo: Bajo-Medio
+  - Impacto: Melhora 95%
+
+MEDIO (4 + 2 problemas):
+  - Tempo: 10-12 horas
+  - Custo: Medio
+  - Impacto: Melhora 98%
+
+BAIXO (3 problemas):
+  - Tempo: 2-3 horas
+  - Custo: Bajo
+  - Impacto: Polish
+
+TOTAL: ~30-35 horas (~4-5 dias de trabalho integral)
+
+================================================================================

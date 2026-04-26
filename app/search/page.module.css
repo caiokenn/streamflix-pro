@@ -1,0 +1,281 @@
+.page { min-height: 100vh; padding: 2rem 0 4rem; }
+
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ─── Search Header ─────────────────────────── */
+.searchHeader { margin-bottom: 2.5rem; }
+
+.searchForm { 
+  margin-bottom: 1rem; 
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchBackBtn {
+  flex-shrink: 0;
+  height: 60px !important;
+  border-radius: var(--radius-xl) !important;
+}
+
+.searchBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 18px;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 18px 58px;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 30px var(--accent-glow), inset 0 2px 10px rgba(0,0,0,0.1);
+  transform: scale(1.01);
+}
+.searchInput::placeholder { color: var(--text-muted); }
+
+.clearBtn {
+  position: absolute;
+  right: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  z-index: 10;
+}
+.clearBtn svg { width: 14px; height: 14px; }
+.clearBtn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+
+/* ─── Suggestions Dropdown ──────────────────── */
+.suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(18, 18, 18, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  padding: 8px;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.suggestionItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.suggestionItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.suggestionPoster {
+  width: 40px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+}
+
+.suggestionInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.suggestionTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.suggestionMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.suggestionType {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.suggestionYear {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.seeAllBtn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition);
+}
+.seeAllBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.resultCount {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+.resultCount span { color: var(--text-primary); font-weight: 700; }
+
+/* ─── Filters ───────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.filterBtn:hover { border-color: var(--border-hover); color: var(--text-primary); }
+.filterActive {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Grid ──────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1.25rem;
+}
+
+.skeletonCard {
+  aspect-ratio: 2/3;
+  border-radius: var(--radius-md);
+}
+
+/* ─── Load More ─────────────────────────────── */
+.loadMore {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.5rem;
+}
+
+/* ─── Trending Section ──────────────────────── */
+.trendingSection {
+  margin-top: 1rem;
+  animation: fadeIn 0.6s ease;
+}
+
+.trendingHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+.trendingHeader h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ─── Empty State ───────────────────────────── */
+.emptyState {
+  text-align: center;
+  padding: 6rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  background: radial-gradient(circle at center, rgba(229, 9, 20, 0.05) 0%, transparent 70%);
+  border-radius: var(--radius-xl);
+}
+
+.emptyIcon { 
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 20px rgba(255,255,255,0.1));
+}
+.emptyState h2 { font-size: 1.75rem; color: var(--text-primary); }
+.emptyState p { color: var(--text-muted); font-size: 1.1rem; max-width: 400px; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .container { padding: 0 1rem; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.875rem; }
+  .searchInput { font-size: 1rem; padding: 16px 52px; }
+  .emptyState { padding: 4rem 1rem; }
+}

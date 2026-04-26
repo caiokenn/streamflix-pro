@@ -1,0 +1,59 @@
+.backBtn {
+  position: fixed;
+  top: 95px;
+  right: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px 12px 20px;
+  background: rgba(20, 20, 20, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 100px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: slideIn 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.backBtn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(229, 9, 20, 0.4);
+  color: #fff;
+}
+
+.backBtn span {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.75rem;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 768px) {
+  .backBtn {
+    top: 80px;
+    right: 1rem;
+    padding: 12px;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    justify-content: center;
+  }
+  .backBtn span {
+    display: none;
+  }
+  .backBtn svg {
+    margin: 0;
+  }
+}

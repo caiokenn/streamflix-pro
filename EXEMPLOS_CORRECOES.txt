@@ -1,0 +1,519 @@
+﻿EXEMPLOS DE CORRECOES - STREAMFLIX
+===================================
+
+================================================================================
+EXEMPLO 1: PROTEGER API KEYS COM API ROUTES
+================================================================================
+
+PROBLEMA ATUAL (INSEGURO):
+--------------------------
+// lib/tmdb.js
+const READ_TOKEN = process.env.NEXT_PUBLIC_TMDB_READ_TOKEN; // Exposto!
+const headers = {
+  Authorization: \Bearer \\,
+  'Content-Type': 'application/json',
+};
+
+async function fetchTMDB(endpoint, params = '') {
+  const sep = params ? '&' : '?';
+  const url = \\\?\\\;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(\TMDB Error: \\);
+  return res.json();
+}
+
+
+SOLUCAO (SEGURA):
+-----------------
+// app/api/tmdb/[...path].js (SERVER-SIDE)
+export async function GET(request, { params }) {
+  // Token secreto no servidor
+  const token = process.env.TMDB_READ_TOKEN;
+  
+  if (!token) {
+    return new Response(JSON.stringify({ error: 'API key not configured' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const { path } = params;
+  const endpoint = '/' + path.join('/');
+  
+  // Validar endpoint
+  if (!/^\/[a-z0-9/_-]+\$/i.test(endpoint)) {
+    return new Response(JSON.stringify({ error: 'Invalid endpoint' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Construir URL com seguranca
+  const url = new URL('https://api.themoviedb.org/3' + endpoint);
+  url.searchParams.set('language', 'pt-BR');
+
+  // Adicionar query params do request
+  const { searchParams } = new URL(request.url);
+  searchParams.forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': \Bearer \\,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({ error: 'TMDB API error' }),
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=3600', // Cache por 1h
+      }
+    });
+  } catch (error) {
+    console.error('[TMDB]', error);
+    return new Response(
+      JSON.stringify({ error: 'Request failed' }),
+      { status: 500 }
+    );
+  }
+}
+
+// lib/tmdb.js (CLIENT-SIDE)
+async function fetchTMDB(endpoint, params = '') {
+  // Construir URL segura no cliente
+  const url = new URL('/api/tmdb' + endpoint, window.location.origin);
+  
+  if (params) {
+    const paramPairs = new URLSearchParams(params);
+    paramPairs.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+  }
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(\API Error: \\);
+    return res.json();
+  } catch (err) {
+    console.error('[TMDB] Error:', err);
+    throw err;
+  }
+}
+
+================================================================================
+EXEMPLO 2: ERROR HANDLING ROBUSTO
+================================================================================
+
+PROBLEMA ATUAL (FRACO):
+-----------------------
+export async function getUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user; // Pode lancar excecao
+}
+
+export async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session; // Erro silencioso
+}
+
+
+SOLUCAO (ROBUSTA):
+------------------
+export async function getUser() {
+  try {
+    const result = await supabase.auth.getUser();
+    
+    if (result.error) {
+      console.error('[AUTH] getUser error:', result.error.message);
+      return null;
+    }
+    
+    return result.data?.user || null;
+  } catch (error) {
+    console.error('[AUTH] getUser exception:', error);
+    return null;
+  }
+}
+
+export async function getSession() {
+  try {
+    const result = await supabase.auth.getSession();
+    
+    if (result.error) {
+      console.error('[AUTH] getSession error:', result.error.message);
+      return null;
+    }
+    
+    return result.data?.session || null;
+  } catch (error) {
+    console.error('[AUTH] getSession exception:', error);
+    return null;
+  }
+}
+
+// lib/supabase.js - Wrapper com retry
+export async function retryAsync(fn, maxRetries = 3, delayMs = 1000) {
+  let lastError;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+// Uso com retry
+const user = await retryAsync(() => getUser(), 2, 500);
+
+================================================================================
+EXEMPLO 3: VALIDACAO DE SENHA FORTE
+================================================================================
+
+PROBLEMA ATUAL (FRACO):
+-----------------------
+// components/Auth/AuthModal.js
+if (!username.trim()) throw new Error('Nome de usuário é obrigatório');
+const { error } = await signUp(email, password, username);
+
+
+SOLUCAO (ROBUSTA):
+------------------
+// lib/validation.js
+export const VALIDATION_RULES = {
+  email: {
+    regex: /^[^\s@]+@[^\s@]+\.[^\s@]+\$/,
+    minLength: 5,
+    maxLength: 100,
+    message: 'Email inválido'
+  },
+  password: {
+    minLength: 8,
+    maxLength: 128,
+    regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@\$!%*?&])[a-zA-Z\d@\$!%*?&]+\$/,
+    message: 'Senha deve ter: 8+ chars, maiúscula, minúscula, número, símbolo'
+  },
+  username: {
+    minLength: 3,
+    maxLength: 20,
+    regex: /^[a-zA-Z0-9_-]+\$/,
+    message: 'Username: 3-20 chars (letras, números, _, -)'
+  }
+};
+
+export function validateField(field, value) {
+  const rule = VALIDATION_RULES[field];
+  if (!rule) return null;
+
+  value = (value || '').trim();
+
+  if (value.length < rule.minLength) {
+    return \\ deve ter no mínimo \ caracteres\;
+  }
+
+  if (rule.maxLength && value.length > rule.maxLength) {
+    return \\ deve ter no máximo \ caracteres\;
+  }
+
+  if (rule.regex && !rule.regex.test(value)) {
+    return rule.message;
+  }
+
+  return null;
+}
+
+// components/Auth/AuthModal.js
+import { validateField } from '@/lib/validation';
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  setError('');
+
+  // Validar email
+  const emailErr = validateField('email', email);
+  if (emailErr) {
+    setError(emailErr);
+    return;
+  }
+
+  // Validar username (se register)
+  if (mode === 'register') {
+    const usernameErr = validateField('username', username);
+    if (usernameErr) {
+      setError(usernameErr);
+      return;
+    }
+  }
+
+  // Validar password
+  const passwordErr = validateField('password', password);
+  if (passwordErr) {
+    setError(passwordErr);
+    return;
+  }
+
+  // Resto do codigo...
+}
+
+================================================================================
+EXEMPLO 4: PROMISE.ALLSETTLED COM CACHE
+================================================================================
+
+PROBLEMA ATUAL (LENTO):
+-----------------------
+// components/ContinueWatching/ContinueWatching.js
+const resolved = await Promise.all(uniqueItems.map(async (item) => {
+  try {
+    const details = item.media_type === 'movie'
+      ? await getMovieDetails(item.tmdb_id)
+      : await getTVDetails(item.tmdb_id);
+    
+    return {
+      ...item,
+      title: details?.title || details?.name || 'Título desconhecido',
+      poster_path: details?.poster_path
+    };
+  } catch (e) {
+    console.error('Erro no item:', e);
+    return item;
+  }
+}));
+
+
+SOLUCAO (OTIMIZADA):
+--------------------
+// components/ContinueWatching/ContinueWatching.js
+async function loadContinueWatching() {
+  const { data } = await getContinueWatching(profile.id);
+  if (!data || data.length === 0) {
+    setItems([]);
+    return;
+  }
+
+  // Filtar duplicatas
+  const uniqueMap = new Map();
+  data.forEach(item => {
+    if (!uniqueMap.has(item.tmdb_id)) {
+      uniqueMap.set(item.tmdb_id, item);
+    }
+  });
+  const uniqueItems = Array.from(uniqueMap.values());
+
+  // Processar em batches de 5
+  let allItems = [];
+  for (let i = 0; i < uniqueItems.length; i += 5) {
+    const batch = uniqueItems.slice(i, i + 5);
+    
+    const results = await Promise.allSettled(
+      batch.map(async (item) => {
+        try {
+          // Tentar cache primeiro
+          let details = await getCachedContent(item.tmdb_id, item.media_type);
+          
+          if (!details) {
+            // Buscar da API
+            details = item.media_type === 'movie'
+              ? await getMovieDetails(item.tmdb_id)
+              : await getTVDetails(item.tmdb_id);
+            
+            // Salvar no cache
+            if (details) {
+              await upsertContentCache(item.tmdb_id, item.media_type, details);
+            }
+          }
+          
+          return {
+            ...item,
+            title: details?.title || details?.name || 'Título desconhecido',
+            poster_path: details?.poster_path
+          };
+        } catch (error) {
+          console.error('[CONTINUE] Error loading item:', error);
+          return item; // Retorna sem detalhes
+        }
+      })
+    );
+
+    // Extrair sucessos e falhas
+    const successItems = results
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value);
+    
+    const failedCount = results.filter(r => r.status === 'rejected').length;
+    if (failedCount > 0) {
+      console.warn(\[CONTINUE] \ items failed to load\);
+    }
+
+    allItems = allItems.concat(successItems);
+    setItems(allItems); // Atualizar UI incrementalmente
+  }
+}
+
+================================================================================
+EXEMPLO 5: HOOK REUTILIZAVEL PARA ASYNC
+================================================================================
+
+// hooks/useAsyncForm.js
+import { useState } from 'react';
+
+export function useAsyncForm(onSubmit) {
+  const [state, setState] = useState({
+    loading: false,
+    error: null,
+    success: null,
+  });
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setState({ loading: true, error: null, success: null });
+
+    try {
+      const result = await onSubmit();
+      setState({ 
+        loading: false, 
+        error: null, 
+        success: result?.message || 'Sucesso!'
+      });
+      return result;
+    } catch (err) {
+      console.error('[FORM]', err);
+      setState({
+        loading: false,
+        error: err.message || 'Erro ao processar',
+        success: null
+      });
+    }
+  }
+
+  return {
+    ...state,
+    handleSubmit,
+    reset: () => setState({ loading: false, error: null, success: null })
+  };
+}
+
+// Uso em ProfileSelector.js
+import { useAsyncForm } from '@/hooks/useAsyncForm';
+
+export default function ProfileSelector() {
+  const { user, profiles, selectProfile, loadProfiles } = useAuth();
+  const [showAdd, setShowAdd] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  
+  const { loading, error, success, handleSubmit } = useAsyncForm(async () => {
+    if (!newUsername.trim()) throw new Error('Nome do perfil é obrigatório');
+    
+    const { data, error } = await createProfile(
+      user.id,
+      newUsername.trim(),
+      '🦁'
+    );
+    
+    if (error) throw error;
+    if (!data) throw new Error('Falha ao criar perfil');
+    
+    await loadProfiles(user.id);
+    setShowAdd(false);
+    setNewUsername('');
+    
+    return { message: 'Perfil criado com sucesso!' };
+  });
+
+  async function onAddProfile(e) {
+    await handleSubmit(e);
+  }
+
+  return (
+    <div className={styles.overlay}>
+      {/* ... */}
+      {showAdd && (
+        <form onSubmit={onAddProfile}>
+          <input
+            type=" text\
+ placeholder=\Nome do perfil\
+ value={newUsername}
+ onChange={e => setNewUsername(e.target.value)}
+ disabled={loading}
+ />
+ {error && <div className={styles.error}>{error}</div>}
+ {success && <div className={styles.success}>{success}</div>}
+ <button type=\submit\ disabled={loading}>
+ {loading ? 'Criando...' : 'Criar Perfil'}
+ </button>
+ </form>
+ )}
+ </div>
+ );
+}
+
+================================================================================
+EXEMPLO 6: THROTTLE NO SCROLL LISTENER
+================================================================================
+
+PROBLEMA ATUAL (LENTO):
+-----------------------
+// components/Navbar/Navbar.js
+useEffect(() => {
+ const handleScroll = () => setScrolled(window.scrollY > 20);
+ window.addEventListener('scroll', handleScroll, { passive: true });
+ return () => window.removeEventListener('scroll', handleScroll);
+}, []);
+
+
+SOLUCAO (OTIMIZADA):
+--------------------
+useEffect(() => {
+ let lastRun = 0;
+ const throttleMs = 150; // Atualizar max a cada 150ms
+
+ const handleScroll = () => {
+ const now = Date.now();
+ if (now - lastRun >= throttleMs) {
+ setScrolled(window.scrollY > 20);
+ lastRun = now;
+ }
+ };
+
+ window.addEventListener('scroll', handleScroll, { passive: true });
+ return () => window.removeEventListener('scroll', handleScroll);
+}, []);
+
+// Alternativa com requestAnimationFrame
+useEffect(() => {
+ let rafId;
+ 
+ const handleScroll = () => {
+ if (rafId) return;
+ 
+ rafId = requestAnimationFrame(() => {
+ setScrolled(window.scrollY > 20);
+ rafId = null;
+ });
+ };
+
+ window.addEventListener('scroll', handleScroll, { passive: true });
+ return () => {
+ window.removeEventListener('scroll', handleScroll);
+ if (rafId) cancelAnimationFrame(rafId);
+ };
+}, []);
+
+================================================================================

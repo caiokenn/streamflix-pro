@@ -1,0 +1,218 @@
+﻿ANALISE DE QUALIDADE DE CODIGO - STREAMFLIX
+=============================================
+
+SCORE GERAL: 6.5/10
+
+SCORE POR CATEGORIA:
+- Seguranca: 5/10 (CRITICO)
+- Error Handling: 5/10 (CRITICO)
+- Performance: 7/10
+- Padroes: 6/10
+- Arquitetura: 8/10
+
+================================================================================
+1. VULNERABILIDADES DE SEGURANCA (5 problemas)
+================================================================================
+
+[1.1] CHAVES DE API EXPOSTAS
+Arquivo: lib/supabase.js, lib/tmdb.js
+Severidade: CRITICO
+Problema: process.env.NEXT_PUBLIC_TMDB_READ_TOKEN exposto ao cliente
+Risco: Qualquer um pode fazer requisicoes a API TMDB
+Solucao: Criar API routes como proxy
+
+[1.2] URL INJECTION VULNERABILITY
+Arquivo: lib/tmdb.js (linha 16)
+Severidade: CRITICO
+Problema: const url = \\\?\\; sem validacao
+Risco: XSS/Injection attack
+Solucao: Usar URLSearchParams para parametros
+
+[1.3] LOCALSTORAGE SEM VALIDACAO
+Arquivo: contexts/AuthContext.js (linhas 44, 52)
+Severidade: ALTO
+Problema: localStorage.setItem('activeProfileId', p.id) sem validar p.id
+Risco: XSS via localStorage
+Solucao: Validar UUID pattern antes de salvar
+
+[1.4] VALIDACAO DE SENHA FRACA
+Arquivo: components/Auth/AuthModal.js
+Severidade: ALTO
+Problema: Sem validacao de complexidade (maiuscula, numero, simbolo)
+Risco: Senhas fracas aceitas
+Solucao: Regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@\$!%*?&])[a-zA-Z\d@\$!%*?&]{8,}\$/
+
+[1.5] ERROR MESSAGES EXPÕEM DETALHES
+Arquivo: components/Auth/AuthModal.js (linha 39)
+Severidade: MEDIO
+Problema: setError(err.message) expõe detalhes internos
+Risco: Information disclosure
+Solucao: Mapear erros para mensagens genéricas
+
+================================================================================
+2. PROBLEMAS DE ERROR HANDLING (7 problemas)
+================================================================================
+
+[2.1] getUser() SEM TRY-CATCH
+Arquivo: lib/supabase.js (47-50)
+Problema: const { data: { user } } pode lancar excecao
+Solucao: Adicionar try-catch, return null se erro
+
+[2.2] getSession() SEM TRY-CATCH
+Arquivo: lib/supabase.js (52-55)
+Problema: Mesmo que 2.1
+Solucao: Mesmo que 2.1
+
+[2.3] PROMISE.ALL SEM FALLBACK
+Arquivo: components/ContinueWatching/ContinueWatching.js
+Problema: Um item falhando quebra tudo
+Solucao: Usar Promise.allSettled ao invés de Promise.all
+
+[2.4] loadProfiles SEM ERROR STATE
+Arquivo: contexts/AuthContext.js (39)
+Problema: Falha silenciosa, nenhum feedback ao usuario
+Solucao: Try-catch + error state
+
+[2.5] ProfileSelector.handleAddProfile SEM TRY-CATCH
+Arquivo: components/Profile/ProfileSelector.js (11-19)
+Problema: Sem feedback de erro se criar perfil falhar
+Solucao: Adicionar estado error/loading, try-catch
+
+[2.6] Navbar.handleSearch SEM TRATAMENTO
+Arquivo: components/Navbar/Navbar.js (51-57)
+Problema: router.push sem try-catch pode falhar silenciosamente
+Solucao: async try-catch com validacao
+
+[2.7] TMDB fetchTMDB ERRO GENERICO
+Arquivo: lib/tmdb.js (14-20)
+Problema: if (!res.ok) throw new Error(...) sem timeout
+Solucao: Adicionar AbortSignal.timeout(10000), logging detalhado
+
+================================================================================
+3. PADROES INCONSISTENTES (4 problemas)
+================================================================================
+
+[3.1] NOMENCLATURA MISTA
+- mediaType vs media_type
+- tmdbId vs tmdb_id
+- profile vs p
+- userId vs user.id
+Solucao: Usar camelCase em JavaScript, snake_case no banco de dados
+
+[3.2] DESTRUCTURING INSEGURO
+Arquivo: lib/supabase.js (48, 53)
+Problema: const { data: { user } } sem verificar result.error primeiro
+Solucao: 
+  const result = await supabase.auth.getUser();
+  if (result.error) return null;
+  return result.data?.user;
+
+[3.3] STATE MANAGEMENT INCONSISTENTE
+AuthModal usa: error, success, loading
+StarRating usa: apenas loading
+Solucao: Criar hook useAsyncForm reutilizavel
+
+[3.4] FALTA DE DOCUMENTACAO
+Arquivo: Todo projeto
+Problema: Sem JSDoc com tipos de parametros
+Solucao: Adicionar JSDoc em todas as funcoes
+
+================================================================================
+4. PROBLEMAS DE PERFORMANCE (2 problemas)
+================================================================================
+
+[4.1] PROMISE.ALL SEM BATCHING
+Arquivo: components/ContinueWatching/ContinueWatching.js
+Problema: Promise.all com muitos getMovieDetails simultâneos
+Impacto: Sobrecarrega API TMDB, página fica lenta
+Solucao: Batching (max 5 por vez) + cache via Supabase
+
+[4.2] SCROLL LISTENER SEM THROTTLE
+Arquivo: components/Navbar/Navbar.js (32)
+Problema: setScrolled() em cada pixel de scroll
+Impacto: 60+ re-renders por segundo em 60fps
+Solucao: Throttle com requestAnimationFrame ou 100-200ms
+
+================================================================================
+5. CODIGO DUPLICADO (3 problemas)
+================================================================================
+
+[5.1] GENRE_MAP HARDCODED
+Arquivo: components/Hero/Hero.js (126-132)
+Problema: Mapa de generos definido dentro do componente
+Solucao: Mover para lib/constants.js e importar
+
+[5.2] IMAGE URL HELPERS DUPLICADOS
+Arquivo: lib/tmdb.js (23-36)
+Problema: 3 funcoes com mesmo padrão
+  - getPosterUrl
+  - getBackdropUrl
+  - getProfileUrl
+Solucao: Criar funcao generica getImageUrl(path, type, size)
+
+[5.3] ERROR MAPPING DUPLICADO
+Arquivo: components/Auth/AuthModal.js (33)
+Problema: Mapeamento de erros apenas neste arquivo
+Solucao: Centralizar em lib/errors.js
+
+================================================================================
+PLANO DE ACAO RECOMENDADO
+================================================================================
+
+FASE 1: CRITICO (Semana 1-2) - PRIORITARIO
+[ ] Criar API routes como proxy para TMDB
+[ ] Adicionar try-catch em getUser/getSession
+[ ] Validacao robusta em AuthModal (regex + length)
+[ ] Validar profileId antes de localStorage
+
+FASE 2: ALTO (Semana 3-4)
+[ ] Promise.allSettled em ContinueWatching
+[ ] Error state em ProfileSelector
+[ ] Padronizar nomenclatura (camelCase)
+[ ] Implementar cache simples para TMDB
+
+FASE 3: MEDIO (Mes 2)
+[ ] Throttle em scroll listener
+[ ] Usar Next.js Image
+[ ] Centralizar constantes (GENRE_MAP)
+[ ] Centralizar errors (ERROR_MESSAGES)
+[ ] Adicionar JSDoc em funcoes
+
+FASE 4: OTIMIZACOES (Mes 2+)
+[ ] Logger centralizado
+[ ] Rate limiting
+[ ] Retry logic
+[ ] Environment validation
+
+================================================================================
+ARQUIVOS PRINCIPAIS A MODIFICAR
+================================================================================
+
+HIGH PRIORITY:
+- lib/supabase.js
+- lib/tmdb.js
+- components/Auth/AuthModal.js
+
+MEDIUM PRIORITY:
+- contexts/AuthContext.js
+- components/ContinueWatching/ContinueWatching.js
+- components/Navbar/Navbar.js
+- components/Profile/ProfileSelector.js
+
+================================================================================
+CONCLUSAO
+================================================================================
+
+ACHADOS PRINCIPAIS:
+1. Projeto tem arquitetura base solida
+2. Vulnerabilidades criticas em seguranca
+3. Error handling inadequado em varias funcoes
+4. Codigo com duplicacao
+5. Oportunidades de performance
+
+STATUS: Funcional, mas com riscos antes de producao
+
+RECOMENDACAO: Implementar Phase 1 (CRITICO) imediatamente
+Tempo estimado: 1-2 semanas
+Impacto: Eliminaria 80% dos riscos identificados
+

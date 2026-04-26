@@ -1,0 +1,345 @@
+.card {
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  outline: none;
+}
+.card:hover { transform: translateY(-4px); }
+.card:focus-visible { outline: 2px solid var(--accent); border-radius: var(--radius-md); }
+
+/* Animation entrance */
+.card {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUpFade 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes slideUpFade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Sizes ─────────────────────────────────── */
+.sm  { width: 110px; }
+.md  { width: 150px; }
+.lg  { width: 190px; }
+.xl  { width: 230px; }
+
+/* ─── Poster ────────────────────────────────── */
+.card {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: visible; /* Necessário para o hover expandir */
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  background: var(--bg-card);
+  z-index: 1;
+}
+
+.card:hover {
+  z-index: 10;
+}
+
+.poster {
+  position: relative;
+  aspect-ratio: 2/3;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.15) 25%, transparent 30%);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.card:hover,
+.card:focus-visible {
+  transform: translateY(-8px) scale(1.05);
+  z-index: 10;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(229, 9, 20, 0.4);
+  outline: none;
+}
+
+.card:focus-visible .glow {
+  opacity: 1;
+}
+
+.card:focus-visible .poster img {
+  filter: brightness(1.1) contrast(1.1);
+}
+
+.card:hover .poster {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(229, 9, 20, 0.4);
+  transform: translateY(-8px);
+}
+
+.card:hover .poster::after {
+  transform: translateX(100%);
+}
+
+.poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.card:hover .poster img {
+  transform: scale(1.1);
+}
+
+/* ─── Trailer Preview ───────────────────────── */
+.trailerWrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+  pointer-events: none;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.trailerVisible {
+  opacity: 1;
+}
+
+.trailerWrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  transform: scale(1.6); /* Zoom para cobrir o card vertical */
+  pointer-events: none;
+}
+
+/* ─── Hover Overlay ─────────────────────────── */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 12, 0.95) 0%,
+    rgba(10, 10, 12, 0.6) 40%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.4s ease;
+  backdrop-filter: blur(2px);
+  z-index: 2;
+}
+.overlayVisible { opacity: 1; }
+
+/* Play button */
+.playBtn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  z-index: 3;
+}
+.playBtn svg { width: 24px; height: 24px; margin-left: 3px; }
+.playBtn:hover {
+  transform: scale(1.15);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 25px var(--accent-glow);
+}
+
+/* Bottom action buttons */
+.listBtn, .infoBtn {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+  bottom: 12px;
+  transition: all 0.3s ease;
+  z-index: 4;
+}
+.listBtn { right: 12px; }
+.infoBtn { right: 50px; }
+
+.listBtn:hover, .infoBtn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: #000;
+  border-color: #fff;
+  transform: scale(1.1);
+}
+.inList {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+.miniSpinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Badges ────────────────────────────────── */
+.rating {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 5;
+}
+
+.typeBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(229, 9, 20, 0.85);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+  z-index: 5;
+}
+
+/* ─── Progress Bar ──────────────────────────── */
+.progressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+}
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 100px 100px 0;
+  box-shadow: 0 0 6px var(--accent-glow);
+  transition: width 0.5s ease;
+}
+
+/* ─── Completed Badge ───────────────────────── */
+.completedBadge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #4ade80;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(2px);
+}
+
+/* ─── Card Info ─────────────────────────────── */
+.info {
+  padding: 8px 2px 0;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  transition: color 0.3s ease;
+}
+
+.card:hover .title {
+  color: #fff;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.year {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+.epInfo {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.progressText {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  margin-left: auto;
+}
+
+/* ─── Responsive ────────────────────────────── */
+@media (max-width: 768px) {
+  .md  { width: 128px; }
+  .lg  { width: 148px; }
+  .playBtn { width: 40px; height: 40px; }
+  .playBtn svg { width: 18px; height: 18px; }
+}

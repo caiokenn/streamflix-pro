@@ -1,0 +1,30 @@
+.homeContainer {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  overflow-x: hidden;
+}
+
+.rowsWrapper {
+  position: relative;
+  margin-top: -80px; /* Reduzido para dar mais distância entre o destaque e a fileira */
+  padding-bottom: 6rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* Reduzido para aproximar as fileiras uma da outra */
+}
+
+/* Container para centralizar o conteúdo em telas ultra-wide */
+.rowsWrapper > :global(*) {
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .rowsWrapper {
+    margin-top: -60px;
+    gap: 10px;
+  }
+}

@@ -1,0 +1,11 @@
+.shareBtn {
+  gap: 10px;
+}
+
+.shareBtn svg {
+  transition: transform 0.2s ease;
+}
+
+.shareBtn:hover svg {
+  transform: translateY(-2px);
+}

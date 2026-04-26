@@ -1,0 +1,40 @@
+.page { min-height: 100vh; }
+
+.heroSkeleton {
+  height: 60vh;
+  min-height: 400px;
+  border-radius: 0;
+  margin-bottom: 2rem;
+}
+
+.rows {
+  padding: 0 2rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.rowGroup { display: flex; flex-direction: column; gap: 1rem; }
+
+.titleSkeleton {
+  width: 200px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+}
+
+.cardRow {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.cardSkeleton {
+  flex-shrink: 0;
+  width: 150px;
+  aspect-ratio: 2/3;
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 768px) {
+  .rows { padding: 0 1rem 4rem; }
+}

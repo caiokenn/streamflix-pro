@@ -1,0 +1,214 @@
+.page { min-height: 100vh; }
+
+/* ─── Hero ──────────────────────────────────── */
+.heroBackdrop {
+  position: relative;
+  height: 55vh;
+  min-height: 400px;
+  overflow: hidden;
+}
+.backdropImg { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.backdropOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(10,10,15,0.3) 0%, var(--bg-primary) 100%);
+}
+
+/* ─── Main ──────────────────────────────────── */
+.mainContent {
+  position: relative;
+  margin-top: -200px;
+  padding-bottom: 4rem;
+  z-index: 2;
+}
+
+.topActions {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ─── Header (Poster + Info) ────────────────── */
+.header {
+  display: flex;
+  gap: 3rem;
+  align-items: flex-start;
+  margin-bottom: 3rem;
+}
+
+.poster {
+  flex-shrink: 0;
+  width: 280px;
+}
+.poster img {
+  width: 100%;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.score {
+  text-align: center;
+  margin-top: 1rem;
+}
+.scoreCircle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: conic-gradient(var(--gold) 0% var(--score), var(--bg-elevated) var(--score) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 6px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gold);
+  position: relative;
+}
+.scoreCircle::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+}
+.scoreCircle span { position: relative; z-index: 1; }
+.score p { font-size: 0.72rem; color: var(--text-muted); }
+
+.info { flex: 1; min-width: 0; padding-top: 1.5rem; }
+
+.genresList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.overview {
+  font-size: 0.975rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
+  max-width: 700px;
+}
+
+.directorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+.metaLabel {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ─── Section ───────────────────────────────── */
+.section { margin: 2.5rem 0; }
+
+.sectionTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.accentLine {
+  display: block;
+  width: 3px;
+  height: 1.2rem;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ─── Cast ──────────────────────────────────── */
+.castGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.castCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all var(--transition);
+}
+.castCard:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-3px);
+}
+
+.castAvatar {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: var(--bg-elevated);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+.castAvatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.castInfo { padding: 10px; }
+.castName { font-size: 0.8rem; font-weight: 700; margin-bottom: 2px; }
+.castChar { font-size: 0.72rem; color: var(--text-muted); }
+
+/* ─── Responsive ────────────────────────────── */
+@media (max-width: 900px) {
+  .header { flex-direction: column; gap: 1.5rem; }
+  .poster { width: 180px; margin: 0 auto; }
+  .info { padding-top: 0; text-align: center; }
+  .genresList, .actions, .metaRow { justify-content: center; }
+}
+
+@media (max-width: 640px) {
+  .container { padding: 0 1rem; }
+  .castGrid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .mainContent { margin-top: -120px; }
+}
+

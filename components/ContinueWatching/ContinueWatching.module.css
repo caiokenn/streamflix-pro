@@ -1,0 +1,220 @@
+.section { padding: 1.5rem 0; }
+
+.header {
+  padding: 0 4%;
+  margin-bottom: 1.25rem;
+}
+
+.title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.accentLine {
+  display: block;
+  width: 3px;
+  height: 1.2rem;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ─── Scroll Row ────────────────────────────── */
+.row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 8px 4% 16px;
+  scrollbar-width: none;
+}
+.row::-webkit-scrollbar { display: none; }
+
+/* ─── Card ──────────────────────────────────── */
+.card {
+  flex-shrink: 0;
+  width: 280px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 20px var(--accent-glow);
+  z-index: 10;
+}
+
+.cardInner {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ─── Thumbnail ─────────────────────────────── */
+.thumb {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+.card:hover .thumb img { transform: scale(1.1); }
+
+/* Play overlay */
+.playOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.card:hover .playOverlay { opacity: 1; }
+
+.playIcon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px var(--accent-glow);
+  transform: scale(0.8);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.card:hover .playIcon { transform: scale(1); }
+.playIcon svg { width: 24px; height: 24px; margin-left: 4px; }
+
+/* Progress Container Overlay */
+.progressContainer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 14px 10px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+  z-index: 5;
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+.progressLabel span { color: var(--accent); }
+
+.progressBar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Card Info ─────────────────────────────── */
+.cardInfo {
+  padding: 14px;
+  background: linear-gradient(180deg, var(--bg-card) 0%, #0a0a0a 100%);
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.remaining {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ─── Floating Actions ──────────────────────── */
+.floatingActions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.3s ease;
+  z-index: 20;
+}
+.card:hover .floatingActions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.floatingBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.floatingBtn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+/* ─── Skeleton ──────────────────────────────── */
+.skeletonCard {
+  flex-shrink: 0;
+  width: 280px;
+  height: 220px;
+  border-radius: var(--radius-xl);
+}
+
+@media (max-width: 768px) {
+  .header { padding: 0 1.25rem; }
+  .row { padding: 8px 1.25rem 16px; gap: 12px; }
+  .card { width: 210px; border-radius: var(--radius-lg); }
+  .floatingActions { opacity: 1; transform: none; }
+  .cardTitle { font-size: 0.85rem; }
+  .remaining { font-size: 0.7rem; }
+  .playIcon { width: 40px; height: 40px; }
+  .playIcon svg { width: 18px; height: 18px; }
+}
