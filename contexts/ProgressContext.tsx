@@ -4,15 +4,28 @@ import { useAuth } from './AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { saveProgress as supabaseSaveProgress } from '@/lib/supabase';
 
-const ProgressContext = createContext({
-  progressMap: {},
-  updateProgress: () => {},
-  loading: true
-});
+interface WatchProgress {
+  id: string;
+  tmdb_id: number;
+  media_type: string;
+  progress: number;
+  duration: number;
+  updated_at: string;
+}
 
-export function ProgressProvider({ children }) {
+interface ProgressContextType {
+  progressMap: Record<string, WatchProgress>;
+  updateProgress: (tmdbId: number, mediaType: string, data: any) => Promise<void>;
+  removeProgress: (mediaType: string, tmdbId: number) => Promise<void>;
+  refreshProgress: () => Promise<void>;
+  loading: boolean;
+}
+
+const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
+
+export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  const [progressMap, setProgressMap] = useState({});
+  const [progressMap, setProgressMap] = useState<Record<string, WatchProgress>>({});
   const [loading, setLoading] = useState(true);
 
   const fetchProgress = useCallback(async () => {
@@ -31,8 +44,8 @@ export function ProgressProvider({ children }) {
       .order('updated_at', { ascending: true });
 
     if (!error && data) {
-      const map = {};
-      data.forEach(item => {
+      const map: Record<string, WatchProgress> = {};
+      data.forEach((item: WatchProgress) => {
         map[`${item.media_type}_${item.tmdb_id}`] = item;
       });
       setProgressMap(map);
@@ -45,7 +58,7 @@ export function ProgressProvider({ children }) {
     fetchProgress();
   }, [fetchProgress]);
 
-  const updateProgress = useCallback(async (tmdbId, mediaType, data) => {
+  const updateProgress = useCallback(async (tmdbId: number, mediaType: string, data: any) => {
     if (!profile?.id) return;
 
     // Atualização Otimista (UI primeiro)
@@ -67,7 +80,7 @@ export function ProgressProvider({ children }) {
     }
   }, [profile?.id]);
 
-  const removeProgress = async (mediaType, tmdbId) => {
+  const removeProgress = async (mediaType: string, tmdbId: number) => {
     if (!profile) return;
     const key = `${mediaType}_${tmdbId}`;
     const supabase = createClient();
@@ -102,4 +115,8 @@ export function ProgressProvider({ children }) {
   );
 }
 
-export const useProgress = () => useContext(ProgressContext);
+export const useProgress = () => {
+  const context = useContext(ProgressContext);
+  if (!context) throw new Error('useProgress must be used within ProgressProvider');
+  return context;
+};
