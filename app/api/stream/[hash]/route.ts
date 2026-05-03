@@ -1,6 +1,8 @@
+import { NextRequest } from 'next/server';
+
 const STREAMING_URL = process.env.NEXT_PUBLIC_STREAMING_URL || 'http://159.112.189.135:4000';
 
-export async function GET(request, { params }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ hash: string }> }) {
   const resolvedParams = await params;
   const hash = resolvedParams?.hash;
   

@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
-  ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles, Users, Wifi
+  ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles, Users, Wifi, Info
 } from 'lucide-react';
 import './VideoPlayer.css';
 import { useAuth } from '@/contexts/AuthContext';
