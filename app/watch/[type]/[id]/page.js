@@ -232,10 +232,10 @@ export default function WatchPage({ params: paramsPromise }) {
         </button>
 
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-          <header style={{ marginBottom: '50px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
-              <span style={{ background: '#00d1b2', color: '#000', padding: '4px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase' }}>Alta Qualidade</span>
-              <h1 style={{ fontSize: '3rem', fontWeight: 900, margin: 0 }}>{movieData?.title || movieData?.name}</h1>
+          <header className="page-header" style={{ marginBottom: '50px' }}>
+            <div className="title-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+              <span className="quality-badge" style={{ background: '#00d1b2', color: '#000', padding: '4px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase' }}>Alta Qualidade</span>
+              <h1 className="page-title" style={{ fontWeight: 900, margin: 0 }}>{movieData?.title || movieData?.name}</h1>
             </div>
             <p style={{ color: '#888', fontSize: '1.1rem', maxWidth: '700px' }}>
               Encontrados {qualityTorrents.length} links em alta qualidade (720p ou superior). Verificando velocidade...
@@ -263,11 +263,11 @@ export default function WatchPage({ params: paramsPromise }) {
                 return (
                   <div 
                     key={i}
+                    className="torrent-card"
                     onClick={() => setSelectedTorrent(t)}
                     style={{ 
                       background: 'rgba(255,255,255,0.02)', 
                       border: '1px solid rgba(255,255,255,0.05)',
-                      padding: '25px',
                       borderRadius: '16px',
                       cursor: 'pointer',
                       display: 'flex',
@@ -288,7 +288,7 @@ export default function WatchPage({ params: paramsPromise }) {
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '25px', flex: 1 }}>
+                    <div className="torrent-card-left" style={{ display: 'flex', flex: 1 }}>
                       <div style={{ 
                         background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
                         width: '60px', height: '60px', borderRadius: '14px', 
@@ -298,14 +298,14 @@ export default function WatchPage({ params: paramsPromise }) {
                         <Play fill="#fff" size={24} />
                       </div>
                       
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{formatTitle(t.title)}</h3>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                          <h3 className="torrent-title" style={{ fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTitle(t.title)}</h3>
                           {info.isHEVC && <span style={{ background: '#9333ea', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>HEVC</span>}
                           {info.isDual && <span style={{ background: '#f59e0b', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>DUAL</span>}
                         </div>
                         
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <div className="torrent-badges" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ 
                             background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
                             color: '#fff',
@@ -343,7 +343,7 @@ export default function WatchPage({ params: paramsPromise }) {
                               <Users size={10} /> {torrentPeers[t.infoHash]}
                             </span>
                           )}
-                          <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>• {t.name}</span>
+                          <span className="torrent-filename" style={{ color: '#6b7280', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>• {t.name}</span>
                         </div>
                       </div>
                     </div>
@@ -370,6 +370,28 @@ export default function WatchPage({ params: paramsPromise }) {
         <style jsx>{` 
           @keyframes spin { to { transform: rotate(360deg); } } 
           .play-btn-circle:hover { background: #e50914; border-color: #e50914; }
+          
+          /* Desktop Defaults */
+          .page-title { font-size: 3rem; }
+          .torrent-card { padding: 25px; }
+          .torrent-card-left { align-items: center; gap: 25px; }
+          .torrent-title { font-size: 1.2rem; }
+          .play-btn-circle { flex-shrink: 0; }
+
+          /* Mobile Responsive */
+          @media (max-width: 768px) {
+            .page-header { margin-bottom: 30px !important; }
+            .title-wrapper { flex-direction: column; align-items: flex-start !important; }
+            .page-title { font-size: 2rem; line-height: 1.1; }
+            
+            .torrent-card { padding: 15px; }
+            .torrent-card-left { gap: 15px; }
+            .torrent-title { font-size: 1rem; white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+            
+            .play-btn-circle { width: 35px !important; height: 35px !important; }
+            
+            .torrent-filename { display: none !important; } /* Hide filename on mobile */
+          }
         `}</style>
       </div>
     );

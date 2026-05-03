@@ -617,3 +617,71 @@
   font-family: var(--sub-font, "Inter", sans-serif) !important;
   text-shadow: 0px 2px 5px rgba(0,0,0,1) !important;
 }
+
+/* RESPONSIVE DESIGN - MOBILE */
+@media (max-width: 768px) {
+  .sf-top-bar {
+    padding: 15px 20px;
+  }
+  
+  .sf-bottom-bar {
+    padding: 15px 20px;
+    gap: 10px;
+  }
+
+  .sf-title-info h2 {
+    font-size: 0.95rem;
+  }
+
+  .sf-center-play {
+    width: 60px;
+    height: 60px;
+  }
+
+  .sf-controls-left, .sf-controls-right {
+    gap: 15px;
+  }
+
+  .sf-control-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .sf-episodes-sidebar {
+    width: 100%;
+    border-left: none;
+  }
+
+  .sf-modern-panel {
+    width: calc(100vw - 40px);
+    right: 20px;
+    bottom: calc(100% + 15px);
+  }
+
+  .sf-stats-badge {
+    display: none; /* Hide advanced stats on mobile to save space */
+  }
+
+  .sf-loading-logo {
+    font-size: 2.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sf-top-bar {
+    padding: 10px 15px;
+  }
+  
+  .sf-bottom-bar {
+    padding: 10px 15px;
+  }
+  
+  .sf-control-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .sf-controls-left, .sf-controls-right {
+    gap: 10px;
+  }
+}
