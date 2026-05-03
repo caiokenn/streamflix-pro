@@ -115,7 +115,7 @@ export default function Hero({ items = [] }) {
 
       <div className={`${styles.content} ${transitioning ? styles.transitioning : ''}`} suppressHydrationWarning>
         <div className={styles.infoBox} suppressHydrationWarning>
-          <div className={styles.meta}>
+          <div className={styles.meta} suppressHydrationWarning>
             <span className={styles.badge}>
               {mediaType === 'movie' ? 'Filme' : 'Série'}
             </span>
@@ -133,14 +133,14 @@ export default function Hero({ items = [] }) {
           {overview && <p className={styles.overview}>{overview}</p>}
 
           {item.genre_ids?.length > 0 && (
-            <div className={styles.genres}>
+            <div className={styles.genres} suppressHydrationWarning>
               {item.genre_ids.slice(0, 2).map(id => (
                 <span key={id} className={styles.genre}>{getGenreName(id)}</span>
               ))}
             </div>
           )}
 
-          <div className={styles.actions}>
+          <div className={styles.actions} suppressHydrationWarning>
             <Link href={watchHref} className={styles.mainBtn} onClick={handleWatchClick}>
               <Play size={18} fill="currentColor" />
               <span>{hasProgress ? 'Continuar Assistindo' : 'Assistir'}</span>

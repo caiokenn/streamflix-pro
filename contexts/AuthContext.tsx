@@ -9,6 +9,11 @@ export interface Profile {
   id: string;
   username: string;
   avatar_url: string;
+  video_preferences?: {
+    addon: string | null;
+    quality: string | null;
+    isDub: boolean | null;
+  };
 }
 
 interface AuthContextType {
@@ -19,6 +24,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthOpen: boolean;
   setIsAuthOpen: (open: boolean) => void;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,6 +70,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else localStorage.removeItem('sf_active_profile');
   };
 
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!profile) return;
+    const newProfile = { ...profile, ...updates };
+    handleSetProfile(newProfile);
+    
+    // Atualiza no banco
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', profile.id);
+    
+    if (error) console.error('Erro ao atualizar perfil:', error);
+  };
+
   const logout = async () => {
     setLoading(true);
     await supabase.auth.signOut();
@@ -75,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, setProfile: handleSetProfile, logout, isAuthOpen, setIsAuthOpen }}>
+    <AuthContext.Provider value={{ user, profile, loading, setProfile: handleSetProfile, logout, isAuthOpen, setIsAuthOpen, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

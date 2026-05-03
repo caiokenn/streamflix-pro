@@ -1,304 +1,402 @@
 'use client';
-import { useState, useEffect, useRef, use, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { getAlternativeVideoSources, getTVDetails, getMovieDetails, getTitle, getTVSeasonDetails, getPosterUrl } from '@/lib/tmdb';
-import { useAuth } from '@/contexts/AuthContext';
-import { useProgress } from '@/contexts/ProgressContext';
-import { LayoutList, Clock, X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
-import BackButton from '@/components/BackButton/BackButton';
-import styles from './page.module.css';
+import React, { useEffect, useState, use } from 'react';
+import { useRouter } from 'next/navigation';
+import { Play, ChevronLeft, Signal, Monitor, HardDrive, Info, Users } from 'lucide-react';
+import VideoPlayer from '@/components/VideoPlayer/VideoPlayer';
 
-function WatchContent({ type, id }) {
+export default function WatchPage({ params: paramsPromise }) {
+  const params = use(paramsPromise);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, profile } = useAuth();
-  const { updateProgress } = useProgress();
+  const { type, id } = params; 
 
-  const season = parseInt(searchParams.get('s') || '1');
-  const episode = parseInt(searchParams.get('e') || '1');
-
-  const [content, setContent] = useState(null);
-  const [currentSource, setCurrentSource] = useState(0);
-  const [sources, setSources] = useState([]);
-  const [seasons, setSeasons] = useState([]);
-  const [episodes, setEpisodes] = useState([]);
+  const [movieData, setMovieData] = useState(null);
+  const [imdbId, setImdbId] = useState(null);
+  const [torrents, setTorrents] = useState([]);
+  const [selectedTorrent, setSelectedTorrent] = useState(null);
+  const [torrentPeers, setTorrentPeers] = useState({});
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [savedTime, setSavedTime] = useState(0);
-  const activeTimeRef = useRef(0);
-  const iframeRef = useRef(null);
-  const progressTimer = useRef(null);
+  const [season, setSeason] = useState(1);
+  const [episode, setEpisode] = useState(1);
+  const [episodes, setEpisodes] = useState([]);
+  const [subtitles, setSubtitles] = useState([]);
 
-  const isTV = type === 'tv';
-
-  // 1. Carregar Detalhes e Progresso Salvo
   useEffect(() => {
-    async function load() {
-      setLoading(true);
+    const fetchMeta = async () => {
       try {
-        const data = await (isTV ? getTVDetails(id) : getMovieDetails(id));
-        setContent(data);
-
-        if (profile) {
-          try {
-            const progressRes = await import('@/lib/supabase').then(m => 
-              m.getProgress(profile.id, id, type, isTV ? season : null, isTV ? episode : null)
-            );
-            if (progressRes.data) {
-              setSavedTime(progressRes.data.position_seconds);
-              activeTimeRef.current = progressRes.data.position_seconds;
-            }
-          } catch (pErr) {
-            console.error('Erro ao buscar progresso:', pErr);
-          }
+        const res = await fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${type}/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&append_to_response=videos`);
+        const data = await res.json();
+        setMovieData(data);
+        if (type === 'tv') fetchEpisodes(1);
+        
+        // Ponte TMDB -> IMDB
+        const extRes = await fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${type}/${id}/external_ids?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`);
+        const extData = await extRes.json();
+        if (extData.imdb_id) {
+          console.log(`ID Traduzido: ${id} -> ${extData.imdb_id}`);
+          setImdbId(extData.imdb_id);
         }
-
-        if (isTV && data.seasons) {
-          const validSeasons = data.seasons.filter(s => s.season_number > 0);
-          setSeasons(validSeasons);
-          
-          // Fetch actual episodes for the current season
-          try {
-            const seasonData = await getTVSeasonDetails(id, season);
-            if (seasonData && seasonData.episodes) {
-              setEpisodes(seasonData.episodes);
-            }
-          } catch (sErr) {
-            console.error('Erro ao buscar episódios da temporada:', sErr);
-            // Fallback to simple list if fetch fails
-            const currentSeason = validSeasons.find(s => s.season_number === season);
-            if (currentSeason) {
-              const eps = Array.from({ length: currentSeason.episode_count }, (_, i) => ({
-                episode_number: i + 1,
-                name: `Episódio ${i + 1}`,
-              }));
-              setEpisodes(eps);
-            }
-          }
-        }
-
-        const srcs = getAlternativeVideoSources(type, id, isTV ? season : null, isTV ? episode : null);
-        setSources(srcs);
       } catch (err) {
-        console.error('Erro ao carregar conteúdo:', err);
+        console.error("Erro ao buscar metadados:", err);
+      }
+    };
+    fetchMeta();
+  }, [type, id]);
+
+  const fetchEpisodes = async (s) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/tv/${id}/season/${s}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`);
+      const data = await res.json();
+      setEpisodes(data.episodes || []);
+    } catch (err) {
+      console.error("Erro ao buscar episódios:", err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchTorrents = async () => {
+      if (!imdbId) return;
+      setLoading(true);
+
+      // URL do Torrentio configurada para priorizar Português e Inglês
+      let url = `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrent9,horriblesubs,nyaasi,megel33,tokyotosho,sukebei|language=portuguese,english/stream/`;
+      url += type === 'movie' ? `movie/${imdbId}.json` : `series/${imdbId}:${season}:${episode}.json`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const streams = data.streams || [];
+        setTorrents(streams);
+        
+        // Buscar peers de cada torrent em background
+        const peersPromises = streams.slice(0, 10).map(async (torrent) => {
+          try {
+            const peerRes = await fetch(`/api/status/${torrent.infoHash}`, { 
+              cache: 'no-store',
+              signal: AbortSignal.timeout(5000)
+            });
+            if (peerRes.ok) {
+              const peerData = await peerRes.json();
+              return { hash: torrent.infoHash, peers: peerData.peers || 0, status: peerData.status };
+            }
+          } catch (e) {}
+          return { hash: torrent.infoHash, peers: 0, status: 'unknown' };
+        });
+        
+        const peersResults = await Promise.all(peersPromises);
+        const peersMap = {};
+        peersResults.forEach(p => { peersMap[p.hash] = p.peers; });
+        setTorrentPeers(peersMap);
+      } catch (err) {
+        console.error("Erro ao buscar torrents:", err);
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, [id, type, season, episode, isTV, profile]);
+    };
+    fetchTorrents();
+  }, [imdbId, type, season, episode]);
 
-  // 2. Rastrear Tempo Ativo e Salvar no Contexto Global
   useEffect(() => {
-    if (!user || !profile || !content) return;
+    const fetchSubtitles = async () => {
+      if (!imdbId) return;
 
-    const duration = content.runtime ? content.runtime * 60 : (isTV ? 2400 : 0);
-
-    const saveCurrentProgress = async () => {
-      if (!content) return;
-      const isCompleted = activeTimeRef.current >= duration * 0.9;
-      const title = content.title || content.name;
+      const mediaType = type === 'tv' ? 'series' : type;
+      const idStr = type === 'movie' ? `${imdbId}` : `${imdbId}:${season}:${episode}`;
       
-      await updateProgress(parseInt(id), type, {
-        position_seconds: activeTimeRef.current,
-        duration_seconds: duration,
-        season_number: isTV ? season : null,
-        episode_number: isTV ? episode : null,
-        status: isCompleted ? 'completed' : 'watching',
-        title: title,
-        poster_path: content.poster_path
-      });
-    };
+      const STREAMING_URL = process.env.NEXT_PUBLIC_STREAMING_URL || 'http://159.112.189.135:4000';
+      const proxyUrl = `/api/subtitles/search?type=${mediaType}&id=${idStr}`;
 
-    const ticker = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        activeTimeRef.current += 1;
+      try {
+        console.log(`Buscando legendas via proxy: ${proxyUrl}`);
+        const res = await fetch(proxyUrl);
+        
+        if (!res.ok) {
+          const text = await res.text();
+          console.error(`Erro no Proxy (${res.status}):`, text.substring(0, 100));
+          setSubtitles([]);
+          return;
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          console.error("O servidor não retornou JSON. Resposta:", text.substring(0, 100));
+          setSubtitles([]);
+          return;
+        }
+
+        const data = await res.json();
+        const subs = data.subtitles || [];
+        console.log(`Legendas brutas encontradas (${subs.length}):`, subs);
+        
+        if (subs.length > 0) {
+          const formattedSubs = subs.map(s => {
+            const l = (s.lang || '').toLowerCase();
+            const isPt = l.includes('por') || l.includes('pob') || l.includes('pt');
+            const isEng = l.includes('eng') || l.includes('en');
+            
+            return {
+              url: s.url,
+              lang: isPt ? 'pt' : (isEng ? 'en' : l.substring(0, 3)),
+              label: isPt ? 'Português' : (isEng ? 'Inglês' : s.lang || 'Outro')
+            };
+          });
+            
+          if (formattedSubs.length > 0) {
+            // Sort to put Portuguese first
+            formattedSubs.sort((a, b) => {
+              if (a.lang === 'pt' && b.lang !== 'pt') return -1;
+              if (a.lang !== 'pt' && b.lang === 'pt') return 1;
+              return 0;
+            });
+            setSubtitles(formattedSubs);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao buscar legendas via proxy:`, err);
       }
-    }, 1000);
+      
+      setSubtitles([]);
+    };
+    fetchSubtitles();
+  }, [imdbId, type, season, episode]);
 
-    progressTimer.current = setInterval(saveCurrentProgress, 15000);
+  const formatTitle = (title) => {
+    if (!title) return "";
+    return title.split('\n')[0].replace(/\./g, ' ').replace(/\[.*?\]/g, '').trim();
+  };
 
-    const handleBeforeUnload = () => {
-      saveCurrentProgress();
+  // LÓGICA DE PARSE INTELIGENTE
+  const parseTorrent = (t) => {
+    const title = t.title.toLowerCase();
+    const info = {
+      resolution: 'SD',
+      audio: 'Legendado',
+      codec: '',
+      language: 'PT-BR',
+      is4K: title.includes('4k') || title.includes('2160p'),
+      is1080p: title.includes('1080p'),
+      is720p: title.includes('720p'),
+      isSD: title.includes('480p') || title.includes('360p') || !title.includes('1080p') && !title.includes('720p'),
+      isDual: title.includes('dual') || title.includes('multi') || title.includes('dublado') || title.includes('dual-audio'),
+      isPT: title.includes('portugues') || title.includes('pt-br') || title.includes('ptbr') || title.includes('dublado') || title.includes('dub') || title.includes('pob'),
+      isBR: title.includes(' br ') || title.includes('brazilian') || title.includes('[br]'),
+      isENG: title.includes('english') || title.includes('eng') || title.includes('sub'),
+      isES: title.includes('espanol') || title.includes('spanish') || title.includes('latino'),
+      isHEVC: title.includes('hevc') || title.includes('x265') || title.includes('10bit'),
+      // Prioridade: 4K > 1080p > 720p > SD
+      qualityScore: (title.includes('4k') || title.includes('2160p')) ? 40 : 
+                     title.includes('1080p') ? 30 : 
+                     title.includes('720p') ? 20 : 5
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    if (info.is4K) info.resolution = '4K';
+    else if (info.is1080p) info.resolution = '1080p';
+    else if (info.is720p) info.resolution = '720p';
+    else if (info.isSD) info.resolution = '480p';
 
-    return () => {
-      clearInterval(ticker);
-      clearInterval(progressTimer.current);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      saveCurrentProgress();
-    };
-  }, [user, profile, content, id, type, season, episode, isTV, updateProgress]);
+    if (info.isDual) {
+      info.audio = 'Dual Áudio';
+      info.language = 'PT-BR + EN';
+    } else if (info.isPT || info.isBR) {
+      info.audio = 'Dublado';
+      info.language = 'PT-BR';
+    } else if (info.isENG) {
+      info.audio = 'Legendado';
+      info.language = 'EN';
+    } else if (info.isES) {
+      info.audio = 'Legendado';
+      info.language = 'ES';
+    } else {
+      info.audio = 'Legendado';
+      info.language = 'Internacional';
+    }
 
-  function navigateEpisode(s, e) {
-    router.push(`/watch/${type}/${id}?s=${s}&e=${e}`);
-  }
+    if (info.isHEVC) info.codec = 'HEVC';
 
-  const title = content ? getTitle(content) : 'Carregando...';
-  const embedUrl = sources[currentSource]?.url || '';
+    return info;
+  };
 
-  return (
-    <div className={styles.watchPage}>
-      <div className={styles.playerHeader}>
-        <div className={styles.headerTop}>
-          <BackButton />
+  // FILTRO: Só mostrar 720p ou superior (alta qualidade)
+  const qualityTorrents = torrents.filter(t => {
+    const info = parseTorrent(t);
+    return info.qualityScore >= 20; // 720p ou melhor
+  });
 
-          <div className={styles.sourceSelector}>
-            <div className={styles.serversLabel}>
-              <span>Servers</span>
-              <div className={styles.menuIcon}>
-                <div className={styles.bar} />
-                <div className={styles.bar} />
-                <div className={styles.bar} />
-              </div>
+  // UI DE SELEÇÃO DE FONTES (INTELIGENTE)
+  if (!selectedTorrent) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#050505', color: '#fff', padding: '60px 20px', fontFamily: 'Inter, sans-serif' }}>
+        <button onClick={() => router.back()} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', padding: '10px 20px', borderRadius: '30px', color: '#fff', cursor: 'pointer', marginBottom: '40px', transition: '0.3s' }}>
+          <ChevronLeft size={20} /> Voltar
+        </button>
+
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <header style={{ marginBottom: '50px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+              <span style={{ background: '#00d1b2', color: '#000', padding: '4px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase' }}>Alta Qualidade</span>
+              <h1 style={{ fontSize: '3rem', fontWeight: 900, margin: 0 }}>{movieData?.title || movieData?.name}</h1>
             </div>
-            <div className={styles.sourceButtons}>
-              {sources.map((src, i) => (
-                <button
-                  key={i}
-                  className={`${styles.sourceBtn} ${i === currentSource ? styles.sourceBtnActive : ''}`}
-                  onClick={() => setCurrentSource(i)}
-                >
-                  <Play size={14} fill="currentColor" />
-                  <span>{src.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+            <p style={{ color: '#888', fontSize: '1.1rem', maxWidth: '700px' }}>
+              Encontrados {qualityTorrents.length} links em alta qualidade (720p ou superior). Verificando velocidade...
+            </p>
+          </header>
 
-          {isTV && (
-            <button className={`${styles.episodesToggle} ${sidebarOpen ? styles.active : ''}`} onClick={() => setSidebarOpen(!sidebarOpen)}>
-              <LayoutList size={18} />
-              <span>Episódios</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className={`${styles.playerArea} ${sidebarOpen ? styles.withSidebar : ''}`}>
-        <div className={styles.playerWrapper}>
           {loading ? (
-            <div className={styles.playerLoading}>
-              <div className={styles.loadingSpinner} />
-              <p>Carregando player...</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', marginTop: '100px' }}>
+              <div className="loader" style={{ width: '60px', height: '60px', border: '4px solid rgba(255,255,255,0.05)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#e50914' }}>Analisando enxame de torrents...</p>
+            </div>
+          ) : qualityTorrents.length > 0 ? (
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {qualityTorrents
+                .sort((a, b) => {
+                  const infoA = parseTorrent(a);
+                  const infoB = parseTorrent(b);
+                  // Pontuação: 4K (100) + Dublado (50) + 1080p (20)
+                  const scoreA = (infoA.is4K ? 100 : 0) + (infoA.isPT ? 50 : 0) + (infoA.is1080p ? 20 : 0);
+                  const scoreB = (infoB.is4K ? 100 : 0) + (infoB.isPT ? 50 : 0) + (infoB.is1080p ? 20 : 0);
+                  return scoreB - scoreA;
+                })
+                .map((t, i) => {
+                  const info = parseTorrent(t);
+                return (
+                  <div 
+                    key={i}
+                    onClick={() => setSelectedTorrent(t)}
+                    style={{ 
+                      background: 'rgba(255,255,255,0.02)', 
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      padding: '25px',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                      e.currentTarget.style.borderColor = '#e50914';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '25px', flex: 1 }}>
+                      <div style={{ 
+                        background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
+                        width: '60px', height: '60px', borderRadius: '14px', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: info.is4K ? '0 10px 20px rgba(229, 9, 20, 0.3)' : 'none'
+                      }}>
+                        <Play fill="#fff" size={24} />
+                      </div>
+                      
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{formatTitle(t.title)}</h3>
+                          {info.isHEVC && <span style={{ background: '#9333ea', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>HEVC</span>}
+                          {info.isDual && <span style={{ background: '#f59e0b', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>DUAL</span>}
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          <span style={{ 
+                            background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
+                            color: '#fff',
+                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
+                            boxShadow: info.is4K ? '0 4px 12px rgba(229, 9, 20, 0.4)' : 'none'
+                          }}>
+                            {info.resolution}
+                          </span>
+                          <span style={{ 
+                            background: info.language.includes('PT') ? 'linear-gradient(45deg, #00d1b2, #10b981)' : '#374151', 
+                            color: '#fff',
+                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 
+                          }}>
+                            {info.language}
+                          </span>
+                          <span style={{ 
+                            background: 'rgba(59, 130, 246, 0.2)', 
+                            color: '#60a5fa',
+                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 
+                          }}>
+                            {info.audio}
+                          </span>
+                          <span style={{ color: '#6b7280', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <HardDrive size={12} /> {t.title.match(/💾 ([\d\.]+ [GMB]+)/)?.[1] || '---'}
+                          </span>
+                          {torrentPeers[t.infoHash] > 0 && (
+                            <span style={{ 
+                              background: torrentPeers[t.infoHash] > 10 ? 'linear-gradient(45deg, #10b981, #34d399)' : 
+                                         torrentPeers[t.infoHash] > 5 ? 'linear-gradient(45deg, #f59e0b, #fbbf24)' : 
+                                         'linear-gradient(45deg, #6b7280, #9ca3af)', 
+                              color: '#fff',
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
+                              display: 'flex', alignItems: 'center', gap: '4px'
+                            }}>
+                              <Users size={10} /> {torrentPeers[t.infoHash]}
+                            </span>
+                          )}
+                          <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>• {t.name}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="play-btn-circle" style={{ 
+                      width: '45px', height: '45px', borderRadius: '50%', 
+                      border: '2px solid rgba(255,255,255,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: '0.3s'
+                    }}>
+                      <ChevronLeft style={{ transform: 'rotate(180deg)' }} size={20} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <>
-              <iframe
-                ref={iframeRef}
-                src={embedUrl}
-                className={styles.player}
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="origin"
-                title={title}
-              />
-              
-              {savedTime > 60 && (
-                <div className={styles.resumeOverlay}>
-                  <div className={styles.resumeToast}>
-                    <div className={styles.resumeIcon}>
-                      <Clock size={20} />
-                    </div>
-                    <div className={styles.resumeInfo}>
-                      <p>Você parou em <strong>{Math.floor(savedTime / 60)}:{(savedTime % 60).toString().padStart(2, '0')}</strong></p>
-                      <span>Avance o player manualmente para retomar de onde parou.</span>
-                    </div>
-                    <button className={styles.resumeClose} onClick={() => setSavedTime(0)}>
-                      <X size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+            <div style={{ textAlign: 'center', marginTop: '100px', color: '#888' }}>
+              <Info size={64} style={{ marginBottom: '20px', opacity: 0.2 }} />
+              <p style={{ fontSize: '1.2rem' }}>Nenhuma fonte em alta qualidade (720p+) disponível para este conteúdo.</p>
+            </div>
           )}
         </div>
-
-        {isTV && sidebarOpen && (
-          <div className={styles.episodesSidebar}>
-            <div className={styles.sidebarHeader}>
-              <h3>Episódios</h3>
-              <select
-                className={styles.seasonSelect}
-                value={season}
-                onChange={e => navigateEpisode(parseInt(e.target.value), 1)}
-              >
-                {seasons.map(s => (
-                  <option key={s.id} value={s.season_number}>Temporada {s.season_number}</option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.episodesList}>
-              {episodes.map(ep => (
-                <button
-                  key={ep.episode_number}
-                  className={`${styles.episodeItem} ${ep.episode_number === episode ? styles.episodeActive : ''}`}
-                  onClick={() => { navigateEpisode(season, ep.episode_number); setSidebarOpen(false); }}
-                >
-                  <div className={styles.epThumbWrapper}>
-                    <img 
-                      src={ep.still_path ? getPosterUrl(ep.still_path, 'w300') : '/placeholder-backdrop.jpg'} 
-                      alt={ep.name} 
-                      className={styles.epThumb}
-                    />
-                    {ep.episode_number === episode && (
-                      <div className={styles.epPlayingOverlay}>
-                        <Play size={20} fill="#fff" />
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.epInfo}>
-                    <span className={styles.epNum}>Episódio {ep.episode_number}</span>
-                    <span className={styles.epTitle}>{ep.name || `Episódio ${ep.episode_number}`}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <style jsx>{` 
+          @keyframes spin { to { transform: rotate(360deg); } } 
+          .play-btn-circle:hover { background: #e50914; border-color: #e50914; }
+        `}</style>
       </div>
+    );
+  }
 
-      {content && (
-        <div className={styles.belowPlayer}>
-          <div className={styles.belowContainer}>
-            <div className={styles.contentInfo}>
-              <h2 className={styles.contentTitle}>{title}</h2>
-              {isTV && <p className={styles.episodeInfo}>Temporada {season} • Episódio {episode}</p>}
-              {content.overview && <p className={styles.contentOverview}>{content.overview}</p>}
-            </div>
-            {isTV && (
-              <div className={styles.epNav}>
-                {episode > 1 && (
-                  <button className="btn btn-secondary" onClick={() => navigateEpisode(season, episode - 1)}>
-                    <ChevronLeft size={16} />
-                    <span>Anterior</span>
-                  </button>
-                )}
-                <button className="btn btn-primary" onClick={() => navigateEpisode(season, episode + 1)}>
-                  <span>Próximo</span>
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  // PLAYER RENDERIZADO APÓS SELEÇÃO
+  const API = process.env.NEXT_PUBLIC_STREAMING_URL || 'http://147.15.92.17:80';
 
-export default function WatchPage({ params }) {
-  const { type, id } = use(params);
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', color: 'var(--text-muted)' }}>
-        <div style={{ width: 48, height: 48, border: '3px solid #222', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <p>Carregando player...</p>
-      </div>
-    }>
-      <WatchContent type={type} id={id} />
-    </Suspense>
+    <main style={{ backgroundColor: '#000', width: '100vw', height: '100vh' }} suppressHydrationWarning>
+      <VideoPlayer 
+        src={`/api/stream/${selectedTorrent.infoHash}`}
+        title={movieData?.title || movieData?.name}
+        posterUrl={movieData?.backdrop_path ? `https://image.tmdb.org/t/p/original${movieData.backdrop_path}` : null}
+        infoHash={selectedTorrent.infoHash}
+        tmdbId={parseInt(id)}
+        mediaType={type}
+        season={season}
+        episode={episode}
+        episodes={episodes}
+        subtitles={subtitles}
+        onEpisodeChange={(epNum) => {
+          const url = `/watch/${type}/${id}?s=${season}&e=${epNum}`;
+          router.push(url);
+        }}
+        onBack={() => setSelectedTorrent(null)}
+      />
+    </main>
   );
 }

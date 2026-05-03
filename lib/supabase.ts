@@ -37,17 +37,30 @@ export async function signUp(email: unknown, password: unknown, username: unknow
 
 export async function saveProgress(profileId: string, tmdbId: number, mediaType: MediaType, data: any) {
   const client = createBrowserClient();
-  return await client
+  const updateData = {
+    profile_id: profileId,
+    tmdb_id: tmdbId,
+    media_type: mediaType,
+    ...data,
+    updated_at: new Date().toISOString()
+  };
+  
+  console.log('[SUPABASE] Salvando progresso:', { profileId, tmdbId, mediaType, pos: data.position_seconds });
+  
+  const { data: resData, error } = await client
     .from('watch_progress')
-    .upsert({
-      profile_id: profileId,
-      tmdb_id: tmdbId,
-      media_type: mediaType,
-      ...data,
-      updated_at: new Date().toISOString()
-    }, {
+    .upsert(updateData, {
       onConflict: 'profile_id, tmdb_id, media_type, season_number, episode_number'
-    });
+    })
+    .select();
+
+  if (error) {
+    console.error('[SUPABASE ERROR] Erro ao salvar progresso:', error.message, error.details);
+  } else {
+    console.log('[SUPABASE] Progresso salvo com sucesso:', resData?.[0]?.id);
+  }
+  
+  return { data: resData, error };
 }
 
 export async function getProgress(profileId: string, tmdbId: number, mediaType: MediaType, season?: number | null, episode?: number | null) {

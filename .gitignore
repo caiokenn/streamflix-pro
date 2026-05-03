@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backend e arquivos temporários
+Minha VPS/
+server-package.json
+server.zip
+streaming-server.cjs
+streaming-server.js
+tmp/

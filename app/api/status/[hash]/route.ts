@@ -1,0 +1,31 @@
+const STREAMING_URL = process.env.NEXT_PUBLIC_STREAMING_URL || 'http://159.112.189.135:4000';
+
+export async function GET(request, { params }) {
+  const resolvedParams = await params;
+  const hash = resolvedParams?.hash;
+  
+  if (!hash || hash.length < 20) {
+    return Response.json({ status: 'invalid', peers: 0 });
+  }
+
+  try {
+    const response = await fetch(`${STREAMING_URL}/status/${hash}`, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return Response.json({ status: 'error', peers: 0 });
+    }
+
+    const data = await response.json();
+    return Response.json(data);
+  } catch (error) {
+    return Response.json({ 
+      status: 'unavailable', 
+      peers: 0,
+      error: error.message 
+    });
+  }
+}
+
+export const dynamic = 'force-dynamic';

@@ -163,7 +163,7 @@ export default function ContentCard({ item, size = 'md', index = 0 }) {
       {/* Info */}
       <div className={styles.info} suppressHydrationWarning>
         <p className={styles.title}>{title}</p>
-        <div className={styles.meta}>
+        <div className={styles.meta} suppressHydrationWarning>
           {year && <span className={styles.year}>{year}</span>}
           {item.season_number && (
             <span className={styles.epInfo}>T{item.season_number} E{item.episode_number}</span>

@@ -74,7 +74,7 @@ export default async function TVDetailPage({ params }) {
 
               {tv.overview && <p className={styles.overview}>{tv.overview}</p>}
 
-              <div className={styles.actions}>
+              <div className={styles.actions} suppressHydrationWarning>
                 <Link href={`/watch/tv/${tv.id}?s=1&e=1`} className="btn btn-primary" style={{ fontSize: '1.05rem', padding: '14px 32px' }}>
                   <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>
                   Assistir Agora
