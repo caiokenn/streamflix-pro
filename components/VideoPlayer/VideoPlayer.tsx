@@ -46,7 +46,7 @@ const VideoPlayer: React.FC<Props> = ({
   const [activeSubtitle, setActiveSubtitle] = useState<number | null>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [videoError, setVideoError] = useState<string | null>(null);
-  const [resumePrompt, setResumePrompt] = useState<{show: boolean, time: number} | null>(null);
+  const initialSeekRef = useRef<number | null>(null);
   const [subDelay, setSubDelay] = useState(0);
   const [subTab, setSubTab] = useState<'lang' | 'settings'>('lang');
   const [subConfig, setSubConfig] = useState({
@@ -361,7 +361,7 @@ const VideoPlayer: React.FC<Props> = ({
     }, 3000);
   };
 
-  // Efeito para carregar progresso inicial
+  // Efeito para carregar progresso inicial e iniciar automaticamente
   useEffect(() => {
     if (profile && !hasLoadedProgress) {
       getProgress(profile.id, tmdbId, mediaType, season, episode).then(({ data }) => {
@@ -370,12 +370,15 @@ const VideoPlayer: React.FC<Props> = ({
         setHasLoadedProgress(true);
         
         if (pos > 10) {
-          console.log('[PLAYER] Progresso encontrado:', pos);
-          setResumePrompt({ show: true, time: pos });
-        } else {
-          if (videoRef.current && videoRef.current.readyState >= 1) {
-            videoRef.current.play().catch(console.warn);
+          console.log('[PLAYER] Retomando progresso automaticamente:', pos);
+          initialSeekRef.current = pos;
+          if (videoRef.current) {
+            videoRef.current.currentTime = pos;
           }
+        }
+        
+        if (videoRef.current) {
+          videoRef.current.play().catch(console.warn);
         }
       });
     }
@@ -404,37 +407,6 @@ const VideoPlayer: React.FC<Props> = ({
       } as React.CSSProperties}
       suppressHydrationWarning
     >
-      {resumePrompt?.show && (
-        <div className="sf-resume-prompt-overlay" style={{
-          position: 'absolute', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.85)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <h2 style={{ color: 'white', marginBottom: '10px', fontSize: '1.8rem' }}>Continuar assistindo?</h2>
-          <p style={{ color: '#aaa', marginBottom: '30px', fontSize: '1.1rem' }}>
-            Você parou em {formatTime(resumePrompt.time)}
-          </p>
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <button onClick={() => {
-              if (videoRef.current) {
-                videoRef.current.currentTime = resumePrompt.time;
-                videoRef.current.play();
-              }
-              setResumePrompt(null);
-            }} style={{ padding: '12px 24px', background: '#e50914', color: 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', border: 'none' }}>
-              Retomar
-            </button>
-            <button onClick={() => {
-              if (videoRef.current) {
-                videoRef.current.currentTime = 0;
-                videoRef.current.play();
-              }
-              setResumePrompt(null);
-            }} style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.2)', color: 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', border: 'none' }}>
-              Começar do Início
-            </button>
-          </div>
-        </div>
-      )}
 
       {videoError && (
         <div className="sf-loading-overlay" style={{ background: 'rgba(0,0,0,0.9)', zIndex: 30 }}>
@@ -515,13 +487,16 @@ const VideoPlayer: React.FC<Props> = ({
         className="sf-video-element"
         src={isTranscoded && transcodeSrc ? transcodeSrc : src}
         onTimeUpdate={handleTimeUpdate}
+        autoPlay
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
-            // Se já carregamos o progresso e não há resume prompt (ou seja, posição <= 10), tocamos.
-            if (hasLoadedProgress && savedPosition <= 10) {
-              videoRef.current.play().catch(console.warn);
+            if (initialSeekRef.current !== null) {
+              console.log('[PLAYER] Retomando para a posição salva:', initialSeekRef.current);
+              videoRef.current.currentTime = initialSeekRef.current;
+              initialSeekRef.current = null;
             }
+            videoRef.current.play().catch(console.warn);
           }
         }}
         onError={(e) => {
