@@ -270,31 +270,7 @@ const VideoPlayer: React.FC<Props> = ({
   }, [infoHash, isTranscoded]);
 
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
 
-    
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleWaiting = () => setIsLoading(true);
-    const handlePlaying = () => {
-      setIsLoading(false);
-      setIsPlaying(true);
-    };
-    
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('playing', handlePlaying);
-    
-    return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('playing', handlePlaying);
-    };
-  }, []);
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
@@ -488,6 +464,13 @@ const VideoPlayer: React.FC<Props> = ({
         src={isTranscoded && transcodeSrc ? transcodeSrc : src}
         onTimeUpdate={handleTimeUpdate}
         autoPlay
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => {
+          setIsLoading(false);
+          setIsPlaying(true);
+        }}
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
