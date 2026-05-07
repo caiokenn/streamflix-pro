@@ -29,7 +29,9 @@ export default function ProfilePage() {
   const [selectedEmoji, setSelectedEmoji] = useState('🦁');
   const [stats, setStats] = useState({ watchlist: 0, watching: 0, completed: 0 });
   const [saving, setSaving] = useState(false);
+  const [savingAddon, setSavingAddon] = useState(false);
   const [bio, setBio] = useState('');
+  const [addonUrl, setAddonUrl] = useState('');
   const [presets, setPresets] = useState([]);
   const [uploading, setUploading] = useState(false);
 
@@ -40,6 +42,7 @@ export default function ProfilePage() {
     setUsername(profile.username || '');
     setSelectedEmoji(profile.avatar_url || '🦁');
     setBio(profile.bio || '');
+    setAddonUrl(profile.video_preferences?.addon || '');
     loadStats();
     loadPresets();
   }, [authLoading, user, profile]);
@@ -78,13 +81,19 @@ export default function ProfilePage() {
     setSaving(true);
     const supabase = createClient();
 
+    const video_preferences = {
+      ...profile.video_preferences,
+      addon: addonUrl || null
+    };
+
     try {
       const { error } = await supabase
         .from('profiles')
         .update({ 
           username, 
           avatar_url: selectedEmoji,
-          bio
+          bio,
+          video_preferences
         })
         .eq('id', profile.id);
 
@@ -95,16 +104,55 @@ export default function ProfilePage() {
         ...profile, 
         username, 
         avatar_url: selectedEmoji,
-        bio 
+        bio,
+        video_preferences
       };
       setProfile(updatedProfile);
 
       toast?.addToast('Perfil atualizado com sucesso!', 'success');
-      // window.location.reload(); // Não precisa mais de reload forçado se o contexto atualizar
     } catch (err) {
       toast?.addToast('Erro ao atualizar perfil', 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveAddon() {
+    if (!profile?.id) return;
+
+    const trimmedUrl = addonUrl?.trim() || '';
+    if (trimmedUrl && !trimmedUrl.toLowerCase().startsWith('http')) {
+      toast?.addToast('A URL do manifesto deve iniciar com http:// ou https://', 'error');
+      return;
+    }
+
+    setSavingAddon(true);
+    const supabase = createClient();
+
+    const video_preferences = {
+      ...profile.video_preferences,
+      addon: trimmedUrl || null
+    };
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ video_preferences })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      // Sincroniza com AuthContext e localStorage
+      setProfile({
+        ...profile,
+        video_preferences
+      });
+
+      toast?.addToast('Configurações de streaming atualizadas!', 'success');
+    } catch (err) {
+      toast?.addToast('Erro ao atualizar configurações de streaming', 'error');
+    } finally {
+      setSavingAddon(false);
     }
   }
 
@@ -314,20 +362,60 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <div className={styles.settingsCard}>
-                <h3><Settings size={20} /> Preferências e Segurança</h3>
-                <div className={styles.infoBox}>
-                  <p>Sua conta está vinculada ao e-mail:</p>
-                  <strong>{user.email}</strong>
-                </div>
-                
-                <div className={styles.dangerZone}>
-                  <h4>Zona de Perigo</h4>
-                  <p>Ações permanentes que não podem ser desfeitas.</p>
-                  <button className={styles.logoutBtn} onClick={() => window.location.href = '/api/auth/logout'}>
-                    <LogOut size={18} />
-                    Encerrar Sessão em todos os aparelhos
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* CONFIGURAÇÃO DE ADDONS STREMIO / TORRENTIO */}
+                <div className={styles.settingsCard}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Settings size={20} style={{ color: '#e50914' }} /> 
+                    Integração Torrentio (Stremio)
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '20px', lineHeight: '1.4' }}>
+                    Personalize as fontes de vídeo usando addons no padrão Stremio. Compatível com Real-Debrid para carregamento instantâneo.
+                  </p>
+                  
+                  <div className={styles.formGroup} style={{ marginBottom: '15px' }}>
+                    <label>URL do Manifesto Torrentio</label>
+                    <div className={styles.inputWrapper}>
+                      <Settings size={18} className={styles.inputIcon} />
+                      <input 
+                        type="text" 
+                        value={addonUrl} 
+                        onChange={(e) => setAddonUrl(e.target.value)}
+                        placeholder="https://torrentio.strem.fun/manifest.json"
+                      />
+                    </div>
+                    <small style={{ display: 'block', marginTop: '10px', color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.75rem', lineHeight: '1.4' }}>
+                      Acesse o site do <a href="https://torrentio.strem.fun/configure" target="_blank" rel="noopener noreferrer" style={{ color: '#e50914', textDecoration: 'underline' }}>Torrentio</a> para configurar trackers ou integrar sua conta Real-Debrid, e depois cole aqui a URL do manifesto gerada.
+                    </small>
+                  </div>
+
+                  <button 
+                    className={styles.saveBtn} 
+                    onClick={handleSaveAddon}
+                    disabled={savingAddon}
+                    style={{ marginTop: '15px', padding: '14px' }}
+                  >
+                    <CheckCircle size={18} />
+                    {savingAddon ? 'Salvando...' : 'Salvar Provedor'}
                   </button>
+                </div>
+
+                {/* SEGURANÇA E CONTA */}
+                <div className={styles.settingsCard}>
+                  <h3><User size={20} /> Preferências e Segurança</h3>
+                  <div className={styles.infoBox} style={{ marginBottom: '25px' }}>
+                    <p>Sua conta está vinculada ao e-mail:</p>
+                    <strong>{user.email}</strong>
+                  </div>
+                  
+                  <div className={styles.dangerZone}>
+                    <h4>Zona de Perigo</h4>
+                    <p>Ações permanentes que não podem ser desfeitas.</p>
+                    <button className={styles.logoutBtn} onClick={() => window.location.href = '/api/auth/logout'}>
+                      <LogOut size={18} />
+                      Encerrar Sessão em todos os aparelhos
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -3,11 +3,13 @@ import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, ChevronLeft, Signal, Monitor, HardDrive, Info, Users } from 'lucide-react';
 import VideoPlayer from '@/components/VideoPlayer/VideoPlayer';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function WatchPage({ params: paramsPromise }) {
   const params = use(paramsPromise);
   const router = useRouter();
   const { type, id } = params; 
+  const { profile } = useAuth();
 
   const [movieData, setMovieData] = useState(null);
   const [imdbId, setImdbId] = useState(null);
@@ -29,11 +31,20 @@ export default function WatchPage({ params: paramsPromise }) {
         if (type === 'tv') fetchEpisodes(1);
         
         // Ponte TMDB -> IMDB
-        const extRes = await fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${type}/${id}/external_ids?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`);
-        const extData = await extRes.json();
-        if (extData.imdb_id) {
-          console.log(`ID Traduzido: ${id} -> ${extData.imdb_id}`);
-          setImdbId(extData.imdb_id);
+        let foundImdbId = data.imdb_id || null;
+        try {
+          const extRes = await fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${type}/${id}/external_ids?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`);
+          const extData = await extRes.json();
+          if (extData.imdb_id) {
+            foundImdbId = extData.imdb_id;
+          }
+        } catch (extErr) {
+          console.warn("Erro ao buscar external_ids, tentando usar id do filme se houver:", extErr);
+        }
+
+        if (foundImdbId) {
+          console.log(`ID Traduzido: ${id} -> ${foundImdbId}`);
+          setImdbId(foundImdbId);
         }
       } catch (err) {
         console.error("Erro ao buscar metadados:", err);
@@ -57,9 +68,32 @@ export default function WatchPage({ params: paramsPromise }) {
       if (!imdbId) return;
       setLoading(true);
 
-      // URL do Torrentio configurada para priorizar Português e Inglês
-      let url = `https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrent9,horriblesubs,nyaasi,megel33,tokyotosho,sukebei|language=portuguese,english/stream/`;
-      url += type === 'movie' ? `movie/${imdbId}.json` : `series/${imdbId}:${season}:${episode}.json`;
+      // URL do Torrentio dinâmica baseada nas preferências do usuário ou default
+      const DEFAULT_TORRENTIO_MANIFEST = "https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrent9,horriblesubs,nyaasi,megel33,tokyotosho,sukebei|language=portuguese,english/manifest.json";
+      let manifestUrl = profile?.video_preferences?.addon;
+      
+      // Validação crítica: Garante que o addon seja uma URL válida, caso contrário usa o fallback padrão
+      if (!manifestUrl || typeof manifestUrl !== "string" || !manifestUrl.trim().toLowerCase().startsWith("http")) {
+        manifestUrl = process.env.NEXT_PUBLIC_TORRENTIO_MANIFEST_URL || DEFAULT_TORRENTIO_MANIFEST;
+      }
+      
+      // Normalização da URL do addon para pegar o endpoint de stream
+      let streamBaseUrl = manifestUrl;
+      if (streamBaseUrl.endsWith('/manifest.json')) {
+        streamBaseUrl = streamBaseUrl.replace('/manifest.json', '/stream/');
+      } else if (!streamBaseUrl.endsWith('/stream/')) {
+        if (streamBaseUrl.endsWith('/')) {
+          streamBaseUrl += 'stream/';
+        } else {
+          streamBaseUrl += '/stream/';
+        }
+      }
+      if (!streamBaseUrl.endsWith('/')) {
+        streamBaseUrl += '/';
+      }
+
+      let url = `${streamBaseUrl}${type === 'movie' ? `movie/${imdbId}.json` : `series/${imdbId}:${season}:${episode}.json`}`;
+      console.log("Buscando fontes via addon Stremio:", url);
 
       try {
         const res = await fetch(url);
@@ -67,8 +101,9 @@ export default function WatchPage({ params: paramsPromise }) {
         const streams = data.streams || [];
         setTorrents(streams);
         
-        // Buscar peers de cada torrent em background
+        // Buscar peers de cada torrent em background (apenas se for P2P/torrent normal que tenha infoHash)
         const peersPromises = streams.slice(0, 10).map(async (torrent) => {
+          if (!torrent.infoHash) return { hash: 'direct', peers: 0, status: 'ready' };
           try {
             const peerRes = await fetch(`/api/status/${torrent.infoHash}`, { 
               cache: 'no-store',
@@ -84,7 +119,9 @@ export default function WatchPage({ params: paramsPromise }) {
         
         const peersResults = await Promise.all(peersPromises);
         const peersMap = {};
-        peersResults.forEach(p => { peersMap[p.hash] = p.peers; });
+        peersResults.forEach(p => { 
+          if (p.hash !== 'direct') peersMap[p.hash] = p.peers; 
+        });
         setTorrentPeers(peersMap);
       } catch (err) {
         console.error("Erro ao buscar torrents:", err);
@@ -93,7 +130,7 @@ export default function WatchPage({ params: paramsPromise }) {
       }
     };
     fetchTorrents();
-  }, [imdbId, type, season, episode]);
+  }, [imdbId, type, season, episode, profile]);
 
   useEffect(() => {
     const fetchSubtitles = async () => {
@@ -166,35 +203,59 @@ export default function WatchPage({ params: paramsPromise }) {
     return title.split('\n')[0].replace(/\./g, ' ').replace(/\[.*?\]/g, '').trim();
   };
 
-  // LÓGICA DE PARSE INTELIGENTE
+  // LÓGICA DE PARSE INTELIGENTE DE TORRENTS/STREAMS STREMIO
   const parseTorrent = (t) => {
-    const title = t.title.toLowerCase();
+    const title = (t.title || '').toLowerCase();
+    const name = (t.name || '').toLowerCase();
+    const combined = `${title}\n${name}`;
+    
+    // Extração de tamanho
+    const sizeMatch = title.match(/💾\s*([\d\.]+\s*[GMB]+)/i) || combined.match(/([\d\.]+\s*gb|[\d\.]+\s*mb)/i);
+    const size = sizeMatch ? sizeMatch[1] : '---';
+
+    // Extração de seeders e leechers das informações retornadas pelo Torrentio
+    // Formatos comuns: 👤 X 👥 Y ou 👤 X ou Seeders: X / Leechers: Y
+    const seedersMatch = title.match(/👤\s*(\d+)/) || combined.match(/seeders:\s*(\d+)/i);
+    const leechersMatch = title.match(/👥\s*(\d+)/) || combined.match(/leechers:\s*(\d+)/i);
+    const seeders = seedersMatch ? parseInt(seedersMatch[1]) : 0;
+    const leechers = leechersMatch ? parseInt(leechersMatch[1]) : 0;
+
     const info = {
+      size,
+      seeders,
+      leechers,
       resolution: 'SD',
       audio: 'Legendado',
       codec: '',
       language: 'PT-BR',
-      is4K: title.includes('4k') || title.includes('2160p'),
-      is1080p: title.includes('1080p'),
-      is720p: title.includes('720p'),
-      isSD: title.includes('480p') || title.includes('360p') || !title.includes('1080p') && !title.includes('720p'),
-      isDual: title.includes('dual') || title.includes('multi') || title.includes('dublado') || title.includes('dual-audio'),
-      isPT: title.includes('portugues') || title.includes('pt-br') || title.includes('ptbr') || title.includes('dublado') || title.includes('dub') || title.includes('pob'),
-      isBR: title.includes(' br ') || title.includes('brazilian') || title.includes('[br]'),
-      isENG: title.includes('english') || title.includes('eng') || title.includes('sub'),
-      isES: title.includes('espanol') || title.includes('spanish') || title.includes('latino'),
-      isHEVC: title.includes('hevc') || title.includes('x265') || title.includes('10bit'),
-      // Prioridade: 4K > 1080p > 720p > SD
-      qualityScore: (title.includes('4k') || title.includes('2160p')) ? 40 : 
-                     title.includes('1080p') ? 30 : 
-                     title.includes('720p') ? 20 : 5
+      is4K: combined.includes('4k') || combined.includes('2160p') || combined.includes('uhd'),
+      is1080p: combined.includes('1080p') || combined.includes('fhd'),
+      is720p: combined.includes('720p') || combined.includes('hd'),
+      isSD: !combined.includes('1080p') && !combined.includes('720p') && !combined.includes('4k') && !combined.includes('2160p'),
+      isDual: combined.includes('dual') || combined.includes('multi') || combined.includes('dublado') || combined.includes('dual-audio') || combined.includes('multi-audio'),
+      isPT: combined.includes('portugues') || combined.includes('pt-br') || combined.includes('ptbr') || combined.includes('dublado') || combined.includes('dub') || combined.includes('pob') || combined.includes('brazilian') || combined.includes('pt-pt'),
+      isBR: combined.includes(' br ') || combined.includes('brazilian') || combined.includes('[br]'),
+      isENG: combined.includes('english') || combined.includes('eng') || combined.includes('sub') || combined.includes('en-us'),
+      isES: combined.includes('espanol') || combined.includes('spanish') || combined.includes('latino'),
+      isHEVC: combined.includes('hevc') || combined.includes('x265') || combined.includes('10bit'),
     };
 
-    if (info.is4K) info.resolution = '4K';
-    else if (info.is1080p) info.resolution = '1080p';
-    else if (info.is720p) info.resolution = '720p';
-    else if (info.isSD) info.resolution = '480p';
+    // Resolução amigável e pontuação
+    if (info.is4K) {
+      info.resolution = '4K';
+      info.qualityScore = 40;
+    } else if (info.is1080p) {
+      info.resolution = '1080p';
+      info.qualityScore = 30;
+    } else if (info.is720p) {
+      info.resolution = '720p';
+      info.qualityScore = 20;
+    } else {
+      info.resolution = '480p';
+      info.qualityScore = 5;
+    }
 
+    // Classificação de áudio e idiomas
     if (info.isDual) {
       info.audio = 'Dual Áudio';
       info.language = 'PT-BR + EN';
@@ -217,11 +278,15 @@ export default function WatchPage({ params: paramsPromise }) {
     return info;
   };
 
-  // FILTRO: Só mostrar 720p ou superior (alta qualidade)
+  // FILTRO: Só mostrar 720p ou superior (alta qualidade) por padrão
   const qualityTorrents = torrents.filter(t => {
     const info = parseTorrent(t);
     return info.qualityScore >= 20; // 720p ou melhor
   });
+
+  // Se não houver nenhum link de alta qualidade, mostramos todos os links como fallback para não deixar a tela vazia
+  const displayedTorrents = qualityTorrents.length > 0 ? qualityTorrents : torrents;
+  const isUsingFallback = qualityTorrents.length === 0 && torrents.length > 0;
 
   // UI DE SELEÇÃO DE FONTES (INTELIGENTE)
   if (!selectedTorrent) {
@@ -234,11 +299,16 @@ export default function WatchPage({ params: paramsPromise }) {
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <header className="page-header" style={{ marginBottom: '50px' }}>
             <div className="title-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
-              <span className="quality-badge" style={{ background: '#00d1b2', color: '#000', padding: '4px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase' }}>Alta Qualidade</span>
+              <span className="quality-badge" style={{ background: isUsingFallback ? '#fbbf24' : '#00d1b2', color: '#000', padding: '4px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase' }}>
+                {isUsingFallback ? 'Qualidade Padrão' : 'Alta Qualidade'}
+              </span>
               <h1 className="page-title" style={{ fontWeight: 900, margin: 0 }}>{movieData?.title || movieData?.name}</h1>
             </div>
             <p style={{ color: '#888', fontSize: '1.1rem', maxWidth: '700px' }}>
-              Encontrados {qualityTorrents.length} links em alta qualidade (720p ou superior). Verificando velocidade...
+              {isUsingFallback 
+                ? 'Nenhum link em HD/4K foi encontrado. Exibindo todos os links disponíveis.'
+                : `Encontrados ${displayedTorrents.length} links de alta qualidade para assistir.`
+              }
             </p>
           </header>
 
@@ -247,123 +317,167 @@ export default function WatchPage({ params: paramsPromise }) {
               <div className="loader" style={{ width: '60px', height: '60px', border: '4px solid rgba(255,255,255,0.05)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               <p style={{ fontSize: '1.1rem', fontWeight: 500, color: '#e50914' }}>Analisando enxame de torrents...</p>
             </div>
-          ) : qualityTorrents.length > 0 ? (
+          ) : displayedTorrents.length > 0 ? (
             <div style={{ display: 'grid', gap: '15px' }}>
-              {qualityTorrents
+              {displayedTorrents
                 .sort((a, b) => {
                   const infoA = parseTorrent(a);
                   const infoB = parseTorrent(b);
-                  // Pontuação: 4K (100) + Dublado (50) + 1080p (20)
-                  const scoreA = (infoA.is4K ? 100 : 0) + (infoA.isPT ? 50 : 0) + (infoA.is1080p ? 20 : 0);
-                  const scoreB = (infoB.is4K ? 100 : 0) + (infoB.isPT ? 50 : 0) + (infoB.is1080p ? 20 : 0);
+                  
+                  // Mescla os seeders reais com o torrentPeers local se disponível
+                  const seedersA = torrentPeers[a.infoHash] || infoA.seeders;
+                  const seedersB = torrentPeers[b.infoHash] || infoB.seeders;
+
+                  // 1. Pontuação de Velocidade baseada nos Seeders (Fator Principal: mais rápidos)
+                  const speedScoreA = (seedersA * 2) + (
+                    seedersA >= 100 ? 600 :
+                    seedersA >= 50 ? 400 :
+                    seedersA >= 20 ? 200 :
+                    seedersA >= 5 ? 50 : 0
+                  );
+                  const speedScoreB = (seedersB * 2) + (
+                    seedersB >= 100 ? 600 :
+                    seedersB >= 50 ? 400 :
+                    seedersB >= 20 ? 200 :
+                    seedersB >= 5 ? 50 : 0
+                  );
+
+                  // 2. Pontuação de Resolução/Qualidade
+                  const qualityScoreA = (infoA.is4K ? 300 : 0) + (infoA.is1080p ? 150 : 0) + (infoA.is720p ? 50 : 0);
+                  const qualityScoreB = (infoB.is4K ? 300 : 0) + (infoB.is1080p ? 150 : 0) + (infoB.is720p ? 50 : 0);
+
+                  // 3. Preferência de Idioma do Usuário (Dublado / Legendado)
+                  const userPrefDub = profile?.video_preferences?.isDub;
+                  let langScoreA = 0;
+                  let langScoreB = 0;
+
+                  if (userPrefDub === true) {
+                    langScoreA = infoA.isPT ? 250 : 0;
+                    langScoreB = infoB.isPT ? 250 : 0;
+                  } else if (userPrefDub === false) {
+                    langScoreA = infoA.isENG ? 250 : 0;
+                    langScoreB = infoB.isENG ? 250 : 0;
+                  } else {
+                    // Sem preferência explícita, prioriza Dublado (PT) por padrão no mercado brasileiro
+                    langScoreA = infoA.isPT ? 150 : 0;
+                    langScoreB = infoB.isPT ? 150 : 0;
+                  }
+
+                  const scoreA = speedScoreA + qualityScoreA + langScoreA;
+                  const scoreB = speedScoreB + qualityScoreB + langScoreB;
+
                   return scoreB - scoreA;
                 })
                 .map((t, i) => {
                   const info = parseTorrent(t);
-                return (
-                  <div 
-                    key={i}
-                    className="torrent-card"
-                    onClick={() => setSelectedTorrent(t)}
-                    style={{ 
-                      background: 'rgba(255,255,255,0.02)', 
-                      border: '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                      e.currentTarget.style.borderColor = '#e50914';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <div className="torrent-card-left" style={{ display: 'flex', flex: 1 }}>
-                      <div style={{ 
-                        background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
-                        width: '60px', height: '60px', borderRadius: '14px', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: info.is4K ? '0 10px 20px rgba(229, 9, 20, 0.3)' : 'none'
-                      }}>
-                        <Play fill="#fff" size={24} />
-                      </div>
-                      
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                          <h3 className="torrent-title" style={{ fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTitle(t.title)}</h3>
-                          {info.isHEVC && <span style={{ background: '#9333ea', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>HEVC</span>}
-                          {info.isDual && <span style={{ background: '#f59e0b', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>DUAL</span>}
+                  
+                  // Mescla os seeders do Torrentio com os atualizados localmente se houver
+                  const activeSeeders = torrentPeers[t.infoHash] || info.seeders;
+
+                  return (
+                    <div 
+                      key={i}
+                      className="torrent-card"
+                      onClick={() => setSelectedTorrent(t)}
+                      style={{ 
+                        background: 'rgba(255,255,255,0.02)', 
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        borderRadius: '16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.borderColor = '#e50914';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <div className="torrent-card-left" style={{ display: 'flex', flex: 1 }}>
+                        <div style={{ 
+                          background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
+                          width: '60px', height: '60px', borderRadius: '14px', 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: info.is4K ? '0 10px 20px rgba(229, 9, 20, 0.3)' : 'none'
+                        }}>
+                          <Play fill="#fff" size={24} />
                         </div>
                         
-                        <div className="torrent-badges" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span style={{ 
-                            background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
-                            color: '#fff',
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
-                            boxShadow: info.is4K ? '0 4px 12px rgba(229, 9, 20, 0.4)' : 'none'
-                          }}>
-                            {info.resolution}
-                          </span>
-                          <span style={{ 
-                            background: info.language.includes('PT') ? 'linear-gradient(45deg, #00d1b2, #10b981)' : '#374151', 
-                            color: '#fff',
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 
-                          }}>
-                            {info.language}
-                          </span>
-                          <span style={{ 
-                            background: 'rgba(59, 130, 246, 0.2)', 
-                            color: '#60a5fa',
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 
-                          }}>
-                            {info.audio}
-                          </span>
-                          <span style={{ color: '#6b7280', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <HardDrive size={12} /> {t.title.match(/💾 ([\d\.]+ [GMB]+)/)?.[1] || '---'}
-                          </span>
-                          {torrentPeers[t.infoHash] > 0 && (
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                            <h3 className="torrent-title" style={{ fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTitle(t.title)}</h3>
+                            {info.isHEVC && <span style={{ background: '#9333ea', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>HEVC</span>}
+                            {info.isDual && <span style={{ background: '#f59e0b', color: '#000', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 900 }}>DUAL</span>}
+                          </div>
+                          
+                          <div className="torrent-badges" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ 
-                              background: torrentPeers[t.infoHash] > 10 ? 'linear-gradient(45deg, #10b981, #34d399)' : 
-                                         torrentPeers[t.infoHash] > 5 ? 'linear-gradient(45deg, #f59e0b, #fbbf24)' : 
-                                         'linear-gradient(45deg, #6b7280, #9ca3af)', 
+                              background: info.is4K ? 'linear-gradient(45deg, #e50914, #ff4d4d)' : '#1a1a1a', 
                               color: '#fff',
-                              padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
-                              display: 'flex', alignItems: 'center', gap: '4px'
+                              padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
+                              boxShadow: info.is4K ? '0 4px 12px rgba(229, 9, 20, 0.4)' : 'none'
                             }}>
-                              <Users size={10} /> {torrentPeers[t.infoHash]}
+                              {info.resolution}
                             </span>
-                          )}
-                          <span className="torrent-filename" style={{ color: '#6b7280', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>• {t.name}</span>
+                            <span style={{ 
+                              background: info.language.includes('PT') ? 'linear-gradient(45deg, #00d1b2, #10b981)' : '#374151', 
+                              color: '#fff',
+                              padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 
+                            }}>
+                              {info.language}
+                            </span>
+                            <span style={{ 
+                              background: 'rgba(59, 130, 246, 0.2)', 
+                              color: '#60a5fa',
+                              padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 
+                            }}>
+                              {info.audio}
+                            </span>
+                            <span style={{ color: '#6b7280', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <HardDrive size={12} /> {info.size}
+                            </span>
+                            {activeSeeders > 0 && (
+                              <span style={{ 
+                                background: activeSeeders > 50 ? 'linear-gradient(45deg, #10b981, #34d399)' : 
+                                           activeSeeders > 10 ? 'linear-gradient(45deg, #f59e0b, #fbbf24)' : 
+                                           'linear-gradient(45deg, #6b7280, #9ca3af)', 
+                                color: '#fff',
+                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
+                                display: 'flex', alignItems: 'center', gap: '4px'
+                              }}>
+                                <Users size={10} /> {activeSeeders}
+                              </span>
+                            )}
+                            <span className="torrent-filename" style={{ color: '#6b7280', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>• {t.name}</span>
+                          </div>
                         </div>
                       </div>
+                      
+                      <div className="play-btn-circle" style={{ 
+                        width: '45px', height: '45px', borderRadius: '50%', 
+                        border: '2px solid rgba(255,255,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: '0.3s'
+                      }}>
+                        <ChevronLeft style={{ transform: 'rotate(180deg)' }} size={20} />
+                      </div>
                     </div>
-                    
-                    <div className="play-btn-circle" style={{ 
-                      width: '45px', height: '45px', borderRadius: '50%', 
-                      border: '2px solid rgba(255,255,255,0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: '0.3s'
-                    }}>
-                      <ChevronLeft style={{ transform: 'rotate(180deg)' }} size={20} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           ) : (
             <div style={{ textAlign: 'center', marginTop: '100px', color: '#888' }}>
               <Info size={64} style={{ marginBottom: '20px', opacity: 0.2 }} />
-              <p style={{ fontSize: '1.2rem' }}>Nenhuma fonte em alta qualidade (720p+) disponível para este conteúdo.</p>
+              <p style={{ fontSize: '1.2rem' }}>Nenhuma fonte disponível para este conteúdo.</p>
             </div>
           )}
         </div>
@@ -398,15 +512,17 @@ export default function WatchPage({ params: paramsPromise }) {
   }
 
   // PLAYER RENDERIZADO APÓS SELEÇÃO
-  const API = process.env.NEXT_PUBLIC_STREAMING_URL || 'http://147.15.92.17:80';
+  // Se o stream possuir uma URL direta (ex: Real-Debrid / links directos), tocamos diretamente
+  // Caso contrário, passamos pela rota de proxy local de streaming WebTorrent
+  const streamSource = selectedTorrent.url || `/api/stream/${selectedTorrent.infoHash}`;
 
   return (
     <main style={{ backgroundColor: '#000', width: '100vw', height: '100vh' }} suppressHydrationWarning>
       <VideoPlayer 
-        src={`/api/stream/${selectedTorrent.infoHash}`}
+        src={streamSource}
         title={movieData?.title || movieData?.name}
         posterUrl={movieData?.backdrop_path ? `https://image.tmdb.org/t/p/original${movieData.backdrop_path}` : null}
-        infoHash={selectedTorrent.infoHash}
+        infoHash={selectedTorrent.infoHash || ''}
         tmdbId={parseInt(id)}
         mediaType={type}
         season={season}

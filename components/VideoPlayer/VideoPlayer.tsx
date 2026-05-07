@@ -60,6 +60,15 @@ const VideoPlayer: React.FC<Props> = ({
   const [savedPosition, setSavedPosition] = useState(0);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTime = useRef<number>(0);
+
+  // --- Faixas de áudio ---
+  interface AudioTrack { index: number; codec: string; language: string; channels: number; compatible: boolean; }
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState(0);
+  const [isTranscoded, setIsTranscoded] = useState(false);
+  const [transcodeSrc, setTranscodeSrc] = useState('');
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [probeStatus, setProbeStatus] = useState<'idle'|'probing'|'done'>('idle');
   
   const formatSpeed = (bytes: number) => {
     if (!bytes || bytes <= 0) return '0 B/s';
@@ -77,9 +86,24 @@ const VideoPlayer: React.FC<Props> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Monitoramento do servidor em tempo real
+  const isP2P = src.includes('/api/stream/');
+
+  // Monitoramento do servidor em tempo real + pré-aquecimento (como o Stremio faz)
   useEffect(() => {
-    if (!infoHash) return;
+    if (!isP2P || !infoHash) {
+      // Conexão direta premium (Real-Debrid, HTTP streams, etc)
+      setStatus({
+        peers: 0,
+        speed: 'Premium ⚡',
+        status: 'Conexão Direta de Alta Velocidade'
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    // Pré-aquecimento: inicia a conexão P2P IMEDIATAMENTE ao abrir o player
+    // (antes mesmo do vídeo começar a ser requisitado)
+    fetch(`/api/status/${infoHash}`, { cache: 'no-store' }).catch(() => {});
     
     let interval: NodeJS.Timeout;
     
@@ -92,12 +116,13 @@ const VideoPlayer: React.FC<Props> = ({
         if (res.ok) {
           const data = await res.json();
           const hasPeers = data.peers > 0;
-          const isLowProgress = parseFloat(data.progress) < 5;
+          const progress = parseFloat(data.progress) || 0;
+          const isLowProgress = progress < 3;
           
           setStatus({
             peers: data.peers || 0,
             speed: formatSpeed(data.speed),
-            status: hasPeers ? `Baixando... ${data.progress}%` : 'Buscando Seeds...'
+            status: hasPeers ? `${data.peers} peers • ${data.progress}` : 'Buscando Seeds...'
           });
           
           // Spinner se não houver peers ou progresso for muito baixo
@@ -115,15 +140,76 @@ const VideoPlayer: React.FC<Props> = ({
     // Primeiro check imediato
     checkStatus();
     
-    // Depois a cada 5 segundos
-    interval = setInterval(checkStatus, 5000);
+    // Depois a cada 4 segundos
+    interval = setInterval(checkStatus, 4000);
     
     return () => clearInterval(interval);
-  }, [infoHash]);
+  }, [infoHash, isP2P]);
+
+  // --------------------------------------------------------
+  // PROBE: detecta codecs e troca para stream transcoded
+  // quando áudio não é compatível (EAC3/DTS/AC3 etc)
+  // --------------------------------------------------------
+  useEffect(() => {
+    if (!isP2P || !infoHash) return;
+    setProbeStatus('probing');
+
+    const doProbe = async () => {
+      // Aguarda o torrent estar pronto (máx 30s)
+      for (let i = 0; i < 60; i++) {
+        try {
+          const r = await fetch(`/api/probe/${infoHash}`, { cache: 'no-store' });
+          if (!r.ok) { await new Promise(res => setTimeout(res, 500)); continue; }
+          const data = await r.json();
+          if (!data.audioTracks) { await new Promise(res => setTimeout(res, 500)); continue; }
+
+          setAudioTracks(data.audioTracks);
+
+          // Encontra a melhor faixa: prefere Português, depois a primeira
+          let bestTrack = 0;
+          const ptTrack = data.audioTracks.findIndex((t: AudioTrack) =>
+            t.language === 'por' || t.language === 'pt' || t.language === 'pb'
+          );
+          if (ptTrack >= 0) bestTrack = ptTrack;
+          setSelectedAudioTrack(bestTrack);
+
+          if (data.needsTranscode) {
+            console.log('[AUDIO] Codec incompatível, usando transcode:', data.audioTracks.map((t: AudioTrack) => t.codec));
+            setIsTranscoded(true);
+            setTranscodeSrc(`/api/transcode/${infoHash}?audioTrack=${bestTrack}&t=0`);
+          }
+          setProbeStatus('done');
+          return;
+        } catch { await new Promise(res => setTimeout(res, 500)); }
+      }
+      setProbeStatus('done'); // Timeout - usa stream original
+    };
+
+    doProbe();
+  }, [infoHash, isP2P]);
+
+  // Muda faixa de áudio: reinicia o stream transcoded na posição atual
+  const switchAudioTrack = useCallback((trackIndex: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const currentTime = video.currentTime || 0;
+    setSelectedAudioTrack(trackIndex);
+    setShowAudioMenu(false);
+    if (isTranscoded) {
+      const newSrc = `/api/transcode/${infoHash}?audioTrack=${trackIndex}&t=${Math.floor(currentTime)}`;
+      setTranscodeSrc(newSrc);
+      video.src = newSrc;
+      video.load();
+      video.currentTime = 0; // fMP4 transcoded começa do tempo passado via ?t=
+      video.play().catch(() => {});
+    }
+  }, [infoHash, isTranscoded]);
+
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
     
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
@@ -342,20 +428,27 @@ const VideoPlayer: React.FC<Props> = ({
               <span style={{ color: '#ffffff' }}>Flix</span>
             </div>
           </div>
-          <div className="sf-loading-stats-badge">
-            <div className="sf-dot"></div>
-            <Wifi size={12} /> <span>{status.speed}</span>
-            <span style={{ opacity: 0.3, margin: '0 6px' }}>|</span>
-            <Users size={12} /> <span>{status.peers}</span>
-          </div>
+          {isP2P ? (
+            <div className="sf-loading-stats-badge">
+              <div className="sf-dot"></div>
+              <Wifi size={12} /> <span>{status.speed}</span>
+              <span style={{ opacity: 0.3, margin: '0 6px' }}>|</span>
+              <Users size={12} /> <span>{status.peers}</span>
+            </div>
+          ) : (
+            <div className="sf-loading-stats-badge" style={{ background: 'rgba(229, 9, 20, 0.25)', border: '1px solid rgba(229, 9, 20, 0.4)' }}>
+              <div className="sf-dot" style={{ backgroundColor: '#e50914' }}></div>
+              <Wifi size={12} style={{ color: '#e50914' }} /> <span style={{ color: '#fff', fontWeight: 'bold' }}>{status.speed}</span>
+            </div>
+          )}
         </div>
       )}
 
       <video 
         ref={videoRef}
-        key={infoHash}
+        key={isTranscoded ? transcodeSrc : src}
         className="sf-video-element"
-        src={`/api/stream/${infoHash}`}
+        src={isTranscoded && transcodeSrc ? transcodeSrc : src}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => {
           if (videoRef.current) {
@@ -433,18 +526,72 @@ const VideoPlayer: React.FC<Props> = ({
                 />
               </div>
 
-              <div className="sf-stats-badge">
-                <div className="sf-dot"></div>
-                <Wifi size={14} />
-                <span>{status.speed}</span>
-                <span style={{ opacity: 0.5 }}>|</span>
-                <Users size={14} />
-                <span>{status.peers}</span>
-              </div>
+              {isP2P ? (
+                <div className="sf-stats-badge">
+                  <div className="sf-dot"></div>
+                  <Wifi size={14} />
+                  <span>{status.speed}</span>
+                  <span style={{ opacity: 0.5 }}>|</span>
+                  <Users size={14} />
+                  <span>{status.peers}</span>
+                </div>
+              ) : (
+                <div className="sf-stats-badge" style={{ background: 'rgba(229, 9, 20, 0.25)', border: '1px solid rgba(229, 9, 20, 0.4)' }}>
+                  <div className="sf-dot" style={{ backgroundColor: '#e50914' }}></div>
+                  <Wifi size={14} style={{ color: '#e50914' }} />
+                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{status.speed}</span>
+                </div>
+              )}
             </div>
 
             <div className="sf-controls-right">
+              {/* Seletor de Faixa de Áudio */}
+              {audioTracks.length > 1 && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className="sf-control-btn"
+                    title="Faixa de Áudio"
+                    onClick={(e) => { e.stopPropagation(); setShowAudioMenu(m => !m); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Volume2 size={22} />
+                    <span style={{ fontSize: 11, fontWeight: 700, background: '#e50914', borderRadius: 4, padding: '1px 5px' }}>
+                      {audioTracks[selectedAudioTrack]?.language?.toUpperCase() || 'A'}
+                    </span>
+                  </button>
+                  {showAudioMenu && (
+                    <div className="sf-subs-menu sf-modern-panel" style={{ bottom: 50, right: 0, minWidth: 160 }} onClick={e => e.stopPropagation()}>
+                      <div className="sf-panel-header" style={{ padding: '10px 14px 8px', fontSize: 12, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1 }}>
+                        Faixa de Áudio
+                      </div>
+                      <div className="sf-panel-content">
+                        <div className="sf-subs-list">
+                          {audioTracks.map((track, i) => (
+                            <div
+                              key={i}
+                              className={`sf-sub-option ${selectedAudioTrack === i ? 'active' : ''}`}
+                              onClick={() => switchAudioTrack(i)}
+                            >
+                              <span style={{ fontWeight: 600 }}>
+                                {track.language === 'por' || track.language === 'pt' || track.language === 'pb' ? '🇧🇷 Português' :
+                                 track.language === 'eng' || track.language === 'en' ? '🇺🇸 Inglês' :
+                                 track.language === 'spa' || track.language === 'es' ? '🇪🇸 Espanhol' :
+                                 track.language === 'und' ? `Faixa ${i + 1}` : track.language.toUpperCase()}
+                              </span>
+                              <span style={{ fontSize: 10, color: '#888', marginLeft: 6 }}>
+                                {track.codec?.toUpperCase()} {track.channels > 0 ? `${track.channels}ch` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {episodes && episodes.length > 0 && (
+
                 <button className="sf-control-btn" onClick={() => setShowEpisodes(!showEpisodes)}>
                   <Settings size={24} />
                 </button>
