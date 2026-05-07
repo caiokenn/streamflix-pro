@@ -69,7 +69,71 @@ const VideoPlayer: React.FC<Props> = ({
   const [transcodeSrc, setTranscodeSrc] = useState('');
   const [showAudioMenu, setShowAudioMenu] = useState(false);
   const [probeStatus, setProbeStatus] = useState<'idle'|'probing'|'done'>('idle');
-  
+
+  // --- Legendas (sistema custom, sem depender de <track> CORS) ---
+  interface Cue { start: number; end: number; text: string; }
+  const parsedCues = useRef<Cue[]>([]);
+  const [currentSubText, setCurrentSubText] = useState('');
+
+  // Parser VTT/SRT simples
+  const parseVTT = (text: string): Cue[] => {
+    const cues: Cue[] = [];
+    // Remove BOM + header WEBVTT
+    const clean = text.replace(/^\uFEFF/, '').replace(/^WEBVTT[^\n]*\n/, '').trim();
+    const blocks = clean.split(/\n\n+/);
+    for (const block of blocks) {
+      const lines = block.trim().split('\n');
+      // Pula índice numérico se houver
+      let tsLine: string = lines[0] ?? '';
+      if (/^\d+$/.test(tsLine.trim())) tsLine = lines[1] ?? '';
+      const tsMatch = tsLine.match(
+        /(\d{1,2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[.,]\d{3})/
+      );
+      if (!tsMatch) continue;
+      const toSec = (s: string) => {
+        const parts = s.replace(',', '.').split(':');
+        const h = parts[0] ?? '0';
+        const m = parts[1] ?? '0';
+        const rest = parts[2] ?? '0';
+        return parseFloat(h) * 3600 + parseFloat(m) * 60 + parseFloat(rest);
+      };
+      const tsIdx = lines.indexOf(tsLine);
+      const textLines = lines.slice(tsIdx >= 0 ? tsIdx + 1 : 1);
+
+      const text = textLines
+        .join('\n')
+        .replace(/<[^>]+>/g, '') // remove tags HTML
+        .trim();
+      if (text) cues.push({ start: toSec(tsMatch[1] ?? '0'), end: toSec(tsMatch[2] ?? '0'), text });
+
+    }
+    return cues;
+  };
+
+  // Carrega e parseia a legenda quando o índice ativo muda
+  useEffect(() => {
+    parsedCues.current = [];
+    setCurrentSubText('');
+    if (activeSubtitle === null || !subtitles || !subtitles[activeSubtitle]) return;
+    const sub = subtitles[activeSubtitle];
+    const proxyUrl = `/api/subtitles?url=${encodeURIComponent(sub.url)}`;
+    fetch(proxyUrl, { cache: 'force-cache' })
+      .then(r => r.text())
+      .then(text => {
+        parsedCues.current = parseVTT(text);
+        console.log('[SUBS] Carregado', parsedCues.current.length, 'cues para', sub.label);
+      })
+      .catch(e => console.error('[SUBS] Erro ao carregar:', e.message));
+  }, [activeSubtitle, subtitles, subDelay]);
+
+  // Sincroniza o texto da legenda com o currentTime do vídeo
+  const syncSubtitleToTime = useCallback((currentTime: number) => {
+    const t = currentTime + subDelay;
+    const cue = parsedCues.current.find(c => t >= c.start && t <= c.end);
+    setCurrentSubText(cue ? cue.text : '');
+  }, [subDelay]);
+
+
   const formatSpeed = (bytes: number) => {
     if (!bytes || bytes <= 0) return '0 B/s';
     const k = 1024;
@@ -250,6 +314,7 @@ const VideoPlayer: React.FC<Props> = ({
     if (video && duration > 0) {
       const currentTime = video.currentTime;
       setProgress((currentTime / duration) * 100);
+      syncSubtitleToTime(currentTime);
 
       // Salvar a cada 10 segundos
       if (profile && Math.abs(currentTime - lastSaveTime.current) > 10) {
@@ -481,6 +546,37 @@ const VideoPlayer: React.FC<Props> = ({
             default={i === activeSubtitle} 
           />
         ))}
+        {/* Legendas como overlay CSS — não depende de CORS do <track> */}
+        {currentSubText && activeSubtitle !== null && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              textAlign: 'center',
+              zIndex: 20,
+              pointerEvents: 'none',
+              maxWidth: '85%',
+            }}
+          >
+            <span style={{
+              display: 'inline-block',
+              background: subConfig.bg,
+              color: subConfig.color,
+              fontFamily: subConfig.font,
+              fontSize: subConfig.size,
+              fontWeight: 600,
+              padding: '4px 12px',
+              borderRadius: '4px',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-line',
+              textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+            }}>
+              {currentSubText}
+            </span>
+          </div>
+        )}
       </video>
 
       <div className="sf-controls-overlay">
