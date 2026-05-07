@@ -53,7 +53,8 @@ const VideoPlayer: React.FC<Props> = ({
     size: '1.2rem',
     color: '#ffffff',
     bg: 'rgba(0,0,0,0.75)',
-    font: '"Inter", sans-serif'
+    font: '"Inter", sans-serif',
+    bottom: '130px' // Média por padrão (subindo de 80px)
   });
   const [status, setStatus] = useState({ peers: 0, speed: '0 KB/s', status: 'Iniciando P2P...' });
   const [hasLoadedProgress, setHasLoadedProgress] = useState(false);
@@ -520,7 +521,7 @@ const VideoPlayer: React.FC<Props> = ({
           <div
             style={{
               position: 'absolute',
-              bottom: '80px',
+              bottom: subConfig.bottom || '130px',
               left: '50%',
               transform: 'translateX(-50%)',
               textAlign: 'center',
@@ -772,6 +773,16 @@ const VideoPlayer: React.FC<Props> = ({
                               <button style={{ fontFamily: '"Inter", sans-serif' }} className={subConfig.font.includes('Inter') ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, font: '"Inter", sans-serif'}) }}>Inter</button>
                               <button style={{ fontFamily: 'Georgia, serif' }} className={subConfig.font.includes('Georgia') ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, font: 'Georgia, serif'}) }}>Serif</button>
                               <button style={{ fontFamily: 'Courier New, monospace' }} className={subConfig.font.includes('Courier') ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, font: 'Courier New, monospace'}) }}>Mono</button>
+                            </div>
+                          </div>
+
+                          <div className="sf-setting-group">
+                            <label>Altura</label>
+                            <div className="sf-setting-options">
+                              <button className={subConfig.bottom === '80px' ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, bottom: '80px'}) }}>Baixa</button>
+                              <button className={subConfig.bottom === '130px' ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, bottom: '130px'}) }}>Média</button>
+                              <button className={subConfig.bottom === '180px' ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, bottom: '180px'}) }}>Alta</button>
+                              <button className={subConfig.bottom === '230px' ? 'active' : ''} onClick={(e) => { e.stopPropagation(); setSubConfig({...subConfig, bottom: '230px'}) }}>M. Alta</button>
                             </div>
                           </div>
 
