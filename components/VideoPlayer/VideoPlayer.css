@@ -50,10 +50,14 @@
   z-index: 10;
 }
 
-.sf-player-container:hover .sf-controls-overlay,
 .sf-player-container.controls-active .sf-controls-overlay {
   opacity: 1;
 }
+
+.sf-player-container:not(.controls-active) {
+  cursor: none;
+}
+
 
 /* Top Bar */
 .sf-top-bar {

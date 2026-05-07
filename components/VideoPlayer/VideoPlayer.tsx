@@ -354,7 +354,7 @@ const VideoPlayer: React.FC<Props> = ({
     if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
     
     // Não esconder se algum menu estiver aberto
-    if (showEpisodes || showSubtitles) return;
+    if (showEpisodes || showSubtitles || showAudioMenu) return;
     
     controlsTimeout.current = setTimeout(() => {
       setShowControls(false);
@@ -383,13 +383,13 @@ const VideoPlayer: React.FC<Props> = ({
 
   // Efeito para resetar o timeout quando menus abrem/fecham
   useEffect(() => {
-    if (showEpisodes || showSubtitles) {
+    if (showEpisodes || showSubtitles || showAudioMenu) {
       if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
       setShowControls(true);
     } else {
       handleMouseMove();
     }
-  }, [showEpisodes, showSubtitles]);
+  }, [showEpisodes, showSubtitles, showAudioMenu]);
 
   return (
     <div 
@@ -535,6 +535,17 @@ const VideoPlayer: React.FC<Props> = ({
         }}
         playsInline
         crossOrigin="anonymous"
+        onClick={(e) => {
+          if (showEpisodes || showSubtitles || showAudioMenu) {
+            setShowEpisodes(false);
+            setShowSubtitles(false);
+            setShowAudioMenu(false);
+          } else {
+            togglePlay();
+          }
+        }}
+        onDoubleClick={toggleFullscreen}
+        style={{ cursor: showControls ? 'pointer' : 'none' }}
       >
         {subtitles?.map((sub, i) => (
           <track 
@@ -579,7 +590,16 @@ const VideoPlayer: React.FC<Props> = ({
         )}
       </video>
 
-      <div className="sf-controls-overlay">
+      <div 
+        className="sf-controls-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowEpisodes(false);
+            setShowSubtitles(false);
+            setShowAudioMenu(false);
+          }
+        }}
+      >
         <div className="sf-top-bar">
           <button className="sf-back-button" onClick={onBack}>
             <ArrowLeft size={24} />
