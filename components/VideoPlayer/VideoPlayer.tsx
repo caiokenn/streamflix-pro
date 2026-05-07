@@ -47,6 +47,8 @@ const VideoPlayer: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [videoError, setVideoError] = useState<string | null>(null);
   const initialSeekRef = useRef<number | null>(null);
+  const transcodeOffsetRef = useRef<number>(0);
+  const savedPositionRef = useRef<number>(0);
   const [subDelay, setSubDelay] = useState(0);
   const [subTab, setSubTab] = useState<'lang' | 'settings'>('lang');
   const [subConfig, setSubConfig] = useState({
@@ -79,36 +81,63 @@ const VideoPlayer: React.FC<Props> = ({
   // Parser VTT/SRT simples
   const parseVTT = (text: string): Cue[] => {
     const cues: Cue[] = [];
-    // Remove BOM + header WEBVTT
-    const clean = text.replace(/^\uFEFF/, '').replace(/^WEBVTT[^\n]*\n/, '').trim();
-    const blocks = clean.split(/\n\n+/);
+    // Normalize carriage returns and remove BOM + optional WEBVTT header
+    const clean = text
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/^\uFEFF/, '')
+      .replace(/^WEBVTT[^\n]*\n/, '')
+      .trim();
+    
+    const blocks = clean.split(/\n\s*\n+/);
     for (const block of blocks) {
       const lines = block.trim().split('\n');
-      // Pula índice numérico se houver
-      let tsLine: string = lines[0] ?? '';
-      if (/^\d+$/.test(tsLine.trim())) tsLine = lines[1] ?? '';
-      const tsMatch = tsLine.match(
-        /(\d{1,2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[.,]\d{3})/
-      );
-      if (!tsMatch) continue;
+      if (lines.length === 0) continue;
+
+      // Find timing line containing -->
+      const tsLine = lines.find(line => line.includes('-->'));
+      if (!tsLine) continue;
+
+      const parts = tsLine.split('-->');
+      if (parts.length < 2) continue;
+
+      const startStr = (parts[0] || '').trim();
+      const endPart = (parts[1] || '').trim();
+      const endStr = endPart.split(/\s+/)[0] || '';
+
       const toSec = (s: string) => {
-        const parts = s.replace(',', '.').split(':');
-        const h = parts[0] ?? '0';
-        const m = parts[1] ?? '0';
-        const rest = parts[2] ?? '0';
-        return parseFloat(h) * 3600 + parseFloat(m) * 60 + parseFloat(rest);
+        const cleanS = s.replace(',', '.');
+        const subParts = cleanS.split(':');
+        if (subParts.length === 3) {
+          const h = parseFloat(subParts[0] || '0');
+          const m = parseFloat(subParts[1] || '0');
+          const sDec = parseFloat(subParts[2] || '0');
+          return h * 3600 + m * 60 + sDec;
+        } else if (subParts.length === 2) {
+          const m = parseFloat(subParts[0] || '0');
+          const sDec = parseFloat(subParts[1] || '0');
+          return m * 60 + sDec;
+        } else {
+          return parseFloat(cleanS) || 0;
+        }
       };
+
+      const start = toSec(startStr);
+      const end = toSec(endStr);
+
       const tsIdx = lines.indexOf(tsLine);
-      const textLines = lines.slice(tsIdx >= 0 ? tsIdx + 1 : 1);
+      const textLines = lines.slice(tsIdx + 1);
 
-      const text = textLines
+      const textVal = textLines
         .join('\n')
-        .replace(/<[^>]+>/g, '') // remove tags HTML
+        .replace(/<[^>]+>/g, '') // strip HTML/formatting tags
         .trim();
-      if (text) cues.push({ start: toSec(tsMatch[1] ?? '0'), end: toSec(tsMatch[2] ?? '0'), text });
 
+      if (textVal) {
+        cues.push({ start, end, text: textVal });
+      }
     }
-    return cues;
+    return cues.sort((a, b) => a.start - b.start);
   };
 
   // Carrega e parseia a legenda quando o índice ativo muda
@@ -125,7 +154,7 @@ const VideoPlayer: React.FC<Props> = ({
         console.log('[SUBS] Carregado', parsedCues.current.length, 'cues para', sub.label);
       })
       .catch(e => console.error('[SUBS] Erro ao carregar:', e.message));
-  }, [activeSubtitle, subtitles, subDelay]);
+  }, [activeSubtitle, subtitles]);
 
   // Sincroniza o texto da legenda com o currentTime do vídeo
   const syncSubtitleToTime = useCallback((currentTime: number) => {
@@ -241,7 +270,9 @@ const VideoPlayer: React.FC<Props> = ({
           if (data.needsTranscode) {
             console.log('[AUDIO] Codec incompatível, usando transcode:', data.audioTracks.map((t: AudioTrack) => t.codec));
             setIsTranscoded(true);
-            setTranscodeSrc(`/api/transcode/${infoHash}?audioTrack=${bestTrack}&t=0`);
+            const startPos = savedPositionRef.current || 0;
+            transcodeOffsetRef.current = startPos;
+            setTranscodeSrc(`/api/transcode/${infoHash}?audioTrack=${bestTrack}&t=${startPos}`);
           }
           setProbeStatus('done');
           return;
@@ -257,11 +288,12 @@ const VideoPlayer: React.FC<Props> = ({
   const switchAudioTrack = useCallback((trackIndex: number) => {
     const video = videoRef.current;
     if (!video) return;
-    const currentTime = video.currentTime || 0;
+    const absoluteTime = transcodeOffsetRef.current + (video.currentTime || 0);
     setSelectedAudioTrack(trackIndex);
     setShowAudioMenu(false);
     if (isTranscoded) {
-      const newSrc = `/api/transcode/${infoHash}?audioTrack=${trackIndex}&t=${Math.floor(currentTime)}`;
+      const newSrc = `/api/transcode/${infoHash}?audioTrack=${trackIndex}&t=${Math.floor(absoluteTime)}`;
+      transcodeOffsetRef.current = Math.floor(absoluteTime);
       setTranscodeSrc(newSrc);
       video.src = newSrc;
       video.load();
@@ -289,15 +321,15 @@ const VideoPlayer: React.FC<Props> = ({
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (video && duration > 0) {
-      const currentTime = video.currentTime;
-      setProgress((currentTime / duration) * 100);
-      syncSubtitleToTime(currentTime);
+      const absTime = transcodeOffsetRef.current + video.currentTime;
+      setProgress((absTime / duration) * 100);
+      syncSubtitleToTime(absTime);
 
       // Salvar a cada 10 segundos
-      if (profile && Math.abs(currentTime - lastSaveTime.current) > 10) {
-        lastSaveTime.current = currentTime;
+      if (profile && Math.abs(absTime - lastSaveTime.current) > 10) {
+        lastSaveTime.current = absTime;
         saveProgress(profile.id, tmdbId, mediaType, {
-          position_seconds: Math.floor(currentTime),
+          position_seconds: Math.floor(absTime),
           duration_seconds: Math.floor(duration),
           status: 'watching',
           season_number: season || null,
@@ -312,7 +344,20 @@ const VideoPlayer: React.FC<Props> = ({
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const pct = x / rect.width;
-      videoRef.current.currentTime = pct * duration;
+      const targetTime = pct * duration;
+
+      if (isTranscoded) {
+        console.log('[PLAYER] Seeking in transcoded stream to:', targetTime);
+        transcodeOffsetRef.current = Math.floor(targetTime);
+        const newSrc = `/api/transcode/${infoHash}?audioTrack=${selectedAudioTrack}&t=${Math.floor(targetTime)}`;
+        setTranscodeSrc(newSrc);
+        videoRef.current.src = newSrc;
+        videoRef.current.load();
+        videoRef.current.currentTime = 0;
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.currentTime = targetTime;
+      }
     }
   };
 
@@ -344,13 +389,25 @@ const VideoPlayer: React.FC<Props> = ({
       getProgress(profile.id, tmdbId, mediaType, season, episode).then(({ data }) => {
         const pos = data?.position_seconds || 0;
         setSavedPosition(pos);
+        savedPositionRef.current = pos;
         setHasLoadedProgress(true);
         
         if (pos > 10) {
           console.log('[PLAYER] Retomando progresso automaticamente:', pos);
           initialSeekRef.current = pos;
-          if (videoRef.current) {
-            videoRef.current.currentTime = pos;
+          if (isTranscoded) {
+            console.log('[PLAYER] Reiniciando transcode na posição salva:', pos);
+            transcodeOffsetRef.current = pos;
+            const newSrc = `/api/transcode/${infoHash}?audioTrack=${selectedAudioTrack}&t=${pos}`;
+            setTranscodeSrc(newSrc);
+            if (videoRef.current) {
+              videoRef.current.src = newSrc;
+              videoRef.current.load();
+            }
+          } else {
+            if (videoRef.current) {
+              videoRef.current.currentTime = pos;
+            }
           }
         }
         
@@ -359,7 +416,7 @@ const VideoPlayer: React.FC<Props> = ({
         }
       });
     }
-  }, [profile, tmdbId, mediaType, season, episode, hasLoadedProgress]);
+  }, [profile, tmdbId, mediaType, season, episode, hasLoadedProgress, isTranscoded, infoHash, selectedAudioTrack]);
 
   // Efeito para resetar o timeout quando menus abrem/fecham
   useEffect(() => {
@@ -476,8 +533,12 @@ const VideoPlayer: React.FC<Props> = ({
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
             if (initialSeekRef.current !== null) {
-              console.log('[PLAYER] Retomando para a posição salva:', initialSeekRef.current);
-              videoRef.current.currentTime = initialSeekRef.current;
+              if (isTranscoded) {
+                console.log('[PLAYER] Transcode já iniciado na posição salva, currentTime mantido em 0');
+              } else {
+                console.log('[PLAYER] Retomando para a posição salva:', initialSeekRef.current);
+                videoRef.current.currentTime = initialSeekRef.current;
+              }
               initialSeekRef.current = null;
             }
             videoRef.current.play().catch(console.warn);
