@@ -74,6 +74,15 @@ const VideoPlayer: React.FC<Props> = ({
     setFlashId(prev => prev + 1);
   };
 
+  // --- Faixas de áudio ---
+  interface AudioTrack { index: number; codec: string; language: string; channels: number; compatible: boolean; }
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState(0);
+  const [isTranscoded, setIsTranscoded] = useState(false);
+  const [transcodeSrc, setTranscodeSrc] = useState('');
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [probeStatus, setProbeStatus] = useState<'idle'|'probing'|'done'>('idle');
+
   const seekToAbsoluteTime = useCallback((targetTime: number) => {
     const video = videoRef.current;
     if (!video || duration <= 0) return;
@@ -99,15 +108,6 @@ const VideoPlayer: React.FC<Props> = ({
       videoRef.current.muted = isMuted;
     }
   }, [volume, isMuted]);
-
-  // --- Faixas de áudio ---
-  interface AudioTrack { index: number; codec: string; language: string; channels: number; compatible: boolean; }
-  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
-  const [selectedAudioTrack, setSelectedAudioTrack] = useState(0);
-  const [isTranscoded, setIsTranscoded] = useState(false);
-  const [transcodeSrc, setTranscodeSrc] = useState('');
-  const [showAudioMenu, setShowAudioMenu] = useState(false);
-  const [probeStatus, setProbeStatus] = useState<'idle'|'probing'|'done'>('idle');
 
   // --- Legendas (sistema custom, sem depender de <track> CORS) ---
   interface Cue { start: number; end: number; text: string; }
