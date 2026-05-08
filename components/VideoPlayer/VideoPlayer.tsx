@@ -63,6 +63,8 @@ const VideoPlayer: React.FC<Props> = ({
   const [savedPosition, setSavedPosition] = useState(0);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTime = useRef<number>(0);
+  const currentPositionRef = useRef<number>(0);
+  const durationRef = useRef<number>(0);
 
   // --- Novos Estados de Alta Performance e Design Premium ---
   const [bufferedProgress, setBufferedProgress] = useState(0);
@@ -324,7 +326,7 @@ const VideoPlayer: React.FC<Props> = ({
           if (data.needsTranscode) {
             console.log('[AUDIO] Codec incompatível, usando transcode:', data.audioTracks.map((t: AudioTrack) => t.codec));
             setIsTranscoded(true);
-            const startPos = savedPositionRef.current || 0;
+            const startPos = currentPositionRef.current || savedPositionRef.current || 0;
             transcodeOffsetRef.current = startPos;
             setTranscodeSrc(`/api/transcode/${infoHash}?audioTrack=${bestTrack}&t=${startPos}`);
           }
@@ -382,6 +384,8 @@ const VideoPlayer: React.FC<Props> = ({
     const video = videoRef.current;
     if (video && duration > 0) {
       const absTime = transcodeOffsetRef.current + video.currentTime;
+      currentPositionRef.current = absTime;
+      durationRef.current = duration;
       setProgress((absTime / duration) * 100);
       syncSubtitleToTime(absTime);
 
@@ -553,6 +557,57 @@ const VideoPlayer: React.FC<Props> = ({
     }
   }, [profile, tmdbId, mediaType, season, episode, hasLoadedProgress, isTranscoded, infoHash, selectedAudioTrack]);
 
+  // Salvar progresso ao desmontar ou fechar a aba
+  useEffect(() => {
+    const saveCurrentProgress = () => {
+      const currentPos = currentPositionRef.current;
+      const totalDur = durationRef.current;
+      if (profile && currentPos > 0 && totalDur > 0) {
+        console.log('[PLAYER] Salvando progresso final antes de desmontar:', currentPos);
+        saveProgress(profile.id, tmdbId, mediaType, {
+          position_seconds: Math.floor(currentPos),
+          duration_seconds: Math.floor(totalDur),
+          status: 'watching',
+          season_number: season || null,
+          episode_number: episode || null
+        });
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      saveCurrentProgress();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      saveCurrentProgress();
+    };
+  }, [profile, tmdbId, mediaType, season, episode]);
+
+  // Resetar estados do player ao trocar de mídia/episódio/torrent
+  useEffect(() => {
+    setHasLoadedProgress(false);
+    setSavedPosition(0);
+    savedPositionRef.current = 0;
+    currentPositionRef.current = 0;
+    setProgress(0);
+    setBufferedProgress(0);
+    setDuration(0);
+    durationRef.current = 0;
+    setIsTranscoded(false);
+    setTranscodeSrc('');
+    transcodeOffsetRef.current = 0;
+    setAudioTracks([]);
+    setSelectedAudioTrack(0);
+    setProbeStatus('idle');
+    setIsLoading(true);
+    setVideoError(null);
+    lastSaveTime.current = 0;
+    initialSeekRef.current = null;
+  }, [infoHash, season, episode, src]);
+
   // Efeito para resetar o timeout quando menus abrem/fecham
   useEffect(() => {
     if (showEpisodes || showSubtitles || showAudioMenu) {
@@ -688,7 +743,9 @@ const VideoPlayer: React.FC<Props> = ({
         onLoadedData={() => setIsLoading(false)}
         onLoadedMetadata={() => {
           if (videoRef.current) {
-            setDuration(videoRef.current.duration);
+            const videoDur = videoRef.current.duration;
+            setDuration(videoDur);
+            durationRef.current = videoDur;
             if (initialSeekRef.current !== null) {
               if (isTranscoded) {
                 console.log('[PLAYER] Transcode já iniciado na posição salva, currentTime mantido em 0');
