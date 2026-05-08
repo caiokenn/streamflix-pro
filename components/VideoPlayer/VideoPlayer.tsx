@@ -723,18 +723,7 @@ const VideoPlayer: React.FC<Props> = ({
         }}
         onDoubleClick={toggleFullscreen}
         style={{ cursor: showControls ? 'pointer' : 'none' }}
-      >
-        {subtitles?.map((sub, i) => (
-          <track 
-            key={`${infoHash}-${i}-${subDelay}`}
-            src={`/api/subtitles?url=${encodeURIComponent(sub.url)}`} 
-            kind="subtitles" 
-            srcLang={sub.lang}
-            label={sub.label} 
-            default={i === activeSubtitle} 
-          />
-        ))}
-      </video>
+      />
 
       {/* Legendas como overlay CSS — fora do <video> para funcionar 100% em qualquer navegador e dispositivo */}
       {currentSubText && activeSubtitle !== null && (
