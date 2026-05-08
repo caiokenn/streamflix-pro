@@ -723,7 +723,7 @@ const VideoPlayer: React.FC<Props> = ({
         }}
         onDoubleClick={toggleFullscreen}
         style={{ cursor: showControls ? 'pointer' : 'none' }}
-      />
+      ></video>
 
       {/* Legendas como overlay CSS — fora do <video> para funcionar 100% em qualquer navegador e dispositivo */}
       {currentSubText && activeSubtitle !== null && (
