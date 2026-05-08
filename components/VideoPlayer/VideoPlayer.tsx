@@ -191,7 +191,6 @@ const VideoPlayer: React.FC<Props> = ({
         speed: 'Premium ⚡',
         status: 'Conexão Direta de Alta Velocidade'
       });
-      setIsLoading(false);
       return;
     }
     
@@ -210,21 +209,12 @@ const VideoPlayer: React.FC<Props> = ({
         if (res.ok) {
           const data = await res.json();
           const hasPeers = data.peers > 0;
-          const progress = parseFloat(data.progress) || 0;
-          const isLowProgress = progress < 3;
           
           setStatus({
             peers: data.peers || 0,
             speed: formatSpeed(data.speed),
             status: hasPeers ? `${data.peers} peers • ${data.progress}` : 'Buscando Seeds...'
           });
-          
-          // Spinner se não houver peers ou progresso for muito baixo
-          if (!hasPeers || isLowProgress) {
-            setIsLoading(true);
-          } else {
-            setIsLoading(false);
-          }
         }
       } catch (e: any) {
         console.log('Status check error:', e.message);
@@ -478,8 +468,8 @@ const VideoPlayer: React.FC<Props> = ({
         </div>
       )}
 
-      {isLoading && !videoError && (
-        <div className="sf-loading-overlay">
+      {!videoError && (
+        <div className={`sf-loading-overlay ${isLoading ? '' : 'sf-hidden'}`}>
           <button 
             className="sf-back-button" 
             onClick={onBack}
@@ -524,11 +514,17 @@ const VideoPlayer: React.FC<Props> = ({
         autoPlay
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        onLoadStart={() => setIsLoading(true)}
         onWaiting={() => setIsLoading(true)}
         onPlaying={() => {
           setIsLoading(false);
           setIsPlaying(true);
         }}
+        onCanPlay={() => setIsLoading(false)}
+        onCanPlayThrough={() => setIsLoading(false)}
+        onSeeking={() => setIsLoading(true)}
+        onSeeked={() => setIsLoading(false)}
+        onLoadedData={() => setIsLoading(false)}
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
