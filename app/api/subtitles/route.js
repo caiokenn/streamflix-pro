@@ -18,38 +18,42 @@ export async function GET(request) {
     // Ler como ArrayBuffer para preservar o encoding original
     const buffer = await response.arrayBuffer();
     
-    // Detectar encoding a partir do Content-Type ou dos metadados do Stremio
-    // As legendas do strem.io geralmente vêm como subencoding-stremio-utf8 na URL
-    // ou têm Content-Type informando o charset
-    const contentType = response.headers.get('content-type') || '';
     let decoded = '';
-    
-    // Se a URL contém 'utf8' ou o content-type informa utf-8, usa UTF-8
-    const isUtf8 = url.toLowerCase().includes('utf8') || 
-                   url.toLowerCase().includes('utf-8') || 
-                   contentType.toLowerCase().includes('utf-8');
-    
-    if (isUtf8) {
-      decoded = new TextDecoder('utf-8').decode(buffer);
-    } else {
-      // Tentar decodificar como Windows-1252 (comum em legendas antigas de PT-BR)
-      // Fallback: UTF-8 se CP1252 não funcionar
+    try {
+      // 1. Tentar decodificar como UTF-8 estrito primeiro
+      decoded = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    } catch {
       try {
+        // 2. Se falhar (caracteres inválidos para UTF-8), decodificar como Windows-1252 (padrão PT-BR antigo)
         decoded = new TextDecoder('windows-1252').decode(buffer);
       } catch {
+        // Fallback de segurança final
         decoded = new TextDecoder('utf-8').decode(buffer);
       }
     }
 
-    // Conversão SRT → VTT
+    // Conversão SRT → VTT com máxima robustez
     let vttContent = decoded;
     if (!decoded.trim().startsWith('WEBVTT')) {
       // Remove BOM se houver
       const clean = decoded.replace(/^\uFEFF/, '');
-      vttContent = 'WEBVTT\n\n' + clean
-        // Converte timestamps SRT (00:00:00,000) para VTT (00:00:00.000)
-        .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
-        // Remove tags de formatação SRT que VTT não suporta
+      
+      // Converte linha por linha para tratar variações de formatação nos timestamps
+      const lines = clean.split('\n');
+      const processedLines = lines.map(line => {
+        if (line.includes('-->')) {
+          // Converte vírgulas de milissegundos para pontos (SRT -> VTT)
+          let processed = line.replace(/,/g, '.');
+          
+          // Corrige timestamps SRT que podem vir com horas de 1 dígito (ex: 0:12:34.567 -> 00:12:34.567)
+          processed = processed.replace(/(?:^|\s)(\d):(\d{2}):(\d{2})\.(\d{3})/g, ' 0$1:$2:$3.$4');
+          return processed;
+        }
+        return line;
+      });
+      
+      vttContent = 'WEBVTT\n\n' + processedLines.join('\n')
+        // Remove tags de formatação SRT que VTT não suporta nativamente
         .replace(/<font[^>]*>/gi, '').replace(/<\/font>/gi, '')
         .replace(/<b>/gi, '<b>').replace(/<\/b>/gi, '</b>')
         .replace(/<i>/gi, '<i>').replace(/<\/i>/gi, '</i>')

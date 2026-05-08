@@ -160,8 +160,36 @@ const VideoPlayer: React.FC<Props> = ({
   const syncSubtitleToTime = useCallback((currentTime: number) => {
     const t = currentTime + subDelay;
     const cue = parsedCues.current.find(c => t >= c.start && t <= c.end);
-    setCurrentSubText(cue ? cue.text : '');
+    const newText = cue ? cue.text : '';
+    
+    // Só atualiza o estado se o texto realmente mudou, evitando re-renders desnecessários a 60fps!
+    setCurrentSubText(prev => prev !== newText ? newText : prev);
   }, [subDelay]);
+
+  // Loop de alta precisão (requestAnimationFrame) para sincronização instantânea das legendas (60fps)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isPlaying || activeSubtitle === null) return;
+
+    let active = true;
+    let frameId: number;
+
+    const updateLoop = () => {
+      if (!active) return;
+      
+      const absTime = transcodeOffsetRef.current + video.currentTime;
+      syncSubtitleToTime(absTime);
+      
+      frameId = requestAnimationFrame(updateLoop);
+    };
+
+    frameId = requestAnimationFrame(updateLoop);
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(frameId);
+    };
+  }, [isPlaying, activeSubtitle, syncSubtitleToTime]);
 
 
   const formatSpeed = (bytes: number) => {
