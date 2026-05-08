@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
-  ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles, Users, Wifi, Info
+  ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Settings, Subtitles, Users, Wifi, Info, RotateCcw, RotateCw
 } from 'lucide-react';
 import './VideoPlayer.css';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +63,42 @@ const VideoPlayer: React.FC<Props> = ({
   const [savedPosition, setSavedPosition] = useState(0);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTime = useRef<number>(0);
+
+  // --- Novos Estados de Alta Performance e Design Premium ---
+  const [bufferedProgress, setBufferedProgress] = useState(0);
+  const [flashType, setFlashType] = useState<'play' | 'pause' | 'forward' | 'rewind' | 'volume-up' | 'volume-down' | null>(null);
+  const [flashId, setFlashId] = useState(0);
+
+  const triggerFlash = (type: 'play' | 'pause' | 'forward' | 'rewind' | 'volume-up' | 'volume-down') => {
+    setFlashType(type);
+    setFlashId(prev => prev + 1);
+  };
+
+  const seekToAbsoluteTime = useCallback((targetTime: number) => {
+    const video = videoRef.current;
+    if (!video || duration <= 0) return;
+
+    if (isTranscoded) {
+      console.log('[PLAYER] Seeking in transcoded stream to:', targetTime);
+      transcodeOffsetRef.current = Math.floor(targetTime);
+      const newSrc = `/api/transcode/${infoHash}?audioTrack=${selectedAudioTrack}&t=${Math.floor(targetTime)}`;
+      setTranscodeSrc(newSrc);
+      video.src = newSrc;
+      video.load();
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    } else {
+      video.currentTime = targetTime;
+    }
+  }, [isTranscoded, infoHash, selectedAudioTrack, duration]);
+
+  // Sincronização automática e robusta de volume e mute com elemento HTML5
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = isMuted;
+    }
+  }, [volume, isMuted]);
 
   // --- Faixas de áudio ---
   interface AudioTrack { index: number; codec: string; language: string; channels: number; compatible: boolean; }
@@ -325,8 +361,13 @@ const VideoPlayer: React.FC<Props> = ({
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause();
-      else videoRef.current.play();
+      if (isPlaying) {
+        videoRef.current.pause();
+        triggerFlash('pause');
+      } else {
+        videoRef.current.play().catch(() => {});
+        triggerFlash('play');
+      }
     }
   }, [isPlaying]);
 
@@ -334,6 +375,7 @@ const VideoPlayer: React.FC<Props> = ({
     const val = parseFloat(e.target.value);
     if (videoRef.current) videoRef.current.volume = val;
     setVolume(val);
+    setIsMuted(val === 0);
   };
 
   const handleTimeUpdate = () => {
@@ -342,6 +384,21 @@ const VideoPlayer: React.FC<Props> = ({
       const absTime = transcodeOffsetRef.current + video.currentTime;
       setProgress((absTime / duration) * 100);
       syncSubtitleToTime(absTime);
+
+      // Calcular o progresso do Buffer em tempo real (Estilo Netflix/YouTube)
+      if (video.buffered && video.buffered.length > 0) {
+        let activeBufferedEnd = 0;
+        for (let i = 0; i < video.buffered.length; i++) {
+          const start = video.buffered.start(i);
+          const end = video.buffered.end(i);
+          if (video.currentTime >= start && video.currentTime <= end) {
+            activeBufferedEnd = end;
+            break;
+          }
+        }
+        const absBufferedEnd = transcodeOffsetRef.current + activeBufferedEnd;
+        setBufferedProgress((absBufferedEnd / duration) * 100);
+      }
 
       // Salvar a cada 10 segundos
       if (profile && Math.abs(absTime - lastSaveTime.current) > 10) {
@@ -358,24 +415,12 @@ const VideoPlayer: React.FC<Props> = ({
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current && duration > 0) {
+    if (duration > 0) {
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const pct = x / rect.width;
       const targetTime = pct * duration;
-
-      if (isTranscoded) {
-        console.log('[PLAYER] Seeking in transcoded stream to:', targetTime);
-        transcodeOffsetRef.current = Math.floor(targetTime);
-        const newSrc = `/api/transcode/${infoHash}?audioTrack=${selectedAudioTrack}&t=${Math.floor(targetTime)}`;
-        setTranscodeSrc(newSrc);
-        videoRef.current.src = newSrc;
-        videoRef.current.load();
-        videoRef.current.currentTime = 0;
-        videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.currentTime = targetTime;
-      }
+      seekToAbsoluteTime(targetTime);
     }
   };
 
@@ -400,6 +445,78 @@ const VideoPlayer: React.FC<Props> = ({
       setShowControls(false);
     }, 3000);
   };
+
+  // Atalhos de Teclado Profissionais (Estilo Netflix, YouTube e Stremio)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      switch (e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'arrowleft':
+        case 'j':
+          e.preventDefault();
+          if (isTranscoded) {
+            const currentAbsTime = transcodeOffsetRef.current + video.currentTime;
+            seekToAbsoluteTime(Math.max(0, currentAbsTime - 10));
+          } else {
+            video.currentTime = Math.max(0, video.currentTime - 10);
+          }
+          triggerFlash('rewind');
+          break;
+        case 'arrowright':
+        case 'l':
+          e.preventDefault();
+          if (isTranscoded) {
+            const currentAbsTime = transcodeOffsetRef.current + video.currentTime;
+            seekToAbsoluteTime(Math.min(duration, currentAbsTime + 10));
+          } else {
+            video.currentTime = Math.min(duration, video.currentTime + 10);
+          }
+          triggerFlash('forward');
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          setVolume(v => {
+            const next = Math.min(1, v + 0.1);
+            if (video) video.volume = next;
+            return next;
+          });
+          setIsMuted(false);
+          triggerFlash('volume-up');
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          setVolume(v => {
+            const next = Math.max(0, v - 0.1);
+            if (video) video.volume = next;
+            return next;
+          });
+          triggerFlash('volume-down');
+          break;
+        case 'm':
+          e.preventDefault();
+          setIsMuted(prev => !prev);
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, isTranscoded, duration, volume, isMuted, seekToAbsoluteTime]);
 
   // Efeito para carregar progresso inicial e iniciar automaticamente
   useEffect(() => {
@@ -513,9 +630,11 @@ const VideoPlayer: React.FC<Props> = ({
           )}
           <div className="sf-loading-content">
             <div className="sf-loading-logo sf-pulse-logo">
-              <span style={{ color: '#e50914' }}>Stream</span>
-              <span style={{ color: '#ffffff' }}>Flix</span>
+              <span className="sf-logo-stream">Stream</span>
+              <span className="sf-logo-flix">Flix</span>
             </div>
+            {/* Elegant Circular loading spinner */}
+            <div className="sf-loading-spinner"></div>
           </div>
           {isP2P ? (
             <div className="sf-loading-stats-badge">
@@ -530,6 +649,20 @@ const VideoPlayer: React.FC<Props> = ({
               <Wifi size={12} style={{ color: '#e50914' }} /> <span style={{ color: '#fff', fontWeight: 'bold' }}>{status.speed}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Indicador Central de Ações (Flash Overlay) */}
+      {flashType && (
+        <div key={flashId} className="sf-flash-indicator-overlay">
+          <div className="sf-flash-bubble">
+            {flashType === 'play' && <Play size={36} fill="white" />}
+            {flashType === 'pause' && <Pause size={36} fill="white" />}
+            {flashType === 'forward' && <span className="sf-flash-text">▶▶ 10s</span>}
+            {flashType === 'rewind' && <span className="sf-flash-text">10s ◀◀</span>}
+            {flashType === 'volume-up' && <span className="sf-flash-text">🔊 {Math.round(volume * 100)}%</span>}
+            {flashType === 'volume-down' && <span className="sf-flash-text">🔉 {Math.round(volume * 100)}%</span>}
+          </div>
         </div>
       )}
 
@@ -601,38 +734,29 @@ const VideoPlayer: React.FC<Props> = ({
             default={i === activeSubtitle} 
           />
         ))}
-        {/* Legendas como overlay CSS — não depende de CORS do <track> */}
-        {currentSubText && activeSubtitle !== null && (
-          <div
+      </video>
+
+      {/* Legendas como overlay CSS — fora do <video> para funcionar 100% em qualquer navegador e dispositivo */}
+      {currentSubText && activeSubtitle !== null && (
+        <div
+          className="sf-subtitle-overlay"
+          style={{ 
+            bottom: `calc(${subConfig.bottom || '130px'} + ${showControls ? '50px' : '0px'})` 
+          }}
+        >
+          <span 
+            className="sf-subtitle-text"
             style={{
-              position: 'absolute',
-              bottom: subConfig.bottom || '130px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              textAlign: 'center',
-              zIndex: 20,
-              pointerEvents: 'none',
-              maxWidth: '85%',
-            }}
-          >
-            <span style={{
-              display: 'inline-block',
               background: subConfig.bg,
               color: subConfig.color,
               fontFamily: subConfig.font,
               fontSize: subConfig.size,
-              fontWeight: 600,
-              padding: '4px 12px',
-              borderRadius: '4px',
-              lineHeight: 1.5,
-              whiteSpace: 'pre-line',
-              textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-            }}>
-              {currentSubText}
-            </span>
-          </div>
-        )}
-      </video>
+            }}
+          >
+            {currentSubText}
+          </span>
+        </div>
+      )}
 
       <div 
         className="sf-controls-overlay"
@@ -662,6 +786,9 @@ const VideoPlayer: React.FC<Props> = ({
 
         <div className="sf-bottom-bar">
           <div className="sf-seek-container" onClick={handleSeek}>
+            {/* Barra de Buffer Pré-carregado em Tempo Real */}
+            <div className="sf-seek-buffered" style={{ width: `${bufferedProgress}%` }}></div>
+            {/* Barra de Progresso de Reprodução */}
             <div className="sf-seek-progress" style={{ width: `${progress}%` }}>
               <div className="sf-seek-handle"></div>
             </div>
@@ -669,20 +796,64 @@ const VideoPlayer: React.FC<Props> = ({
 
           <div className="sf-main-controls">
             <div className="sf-controls-left">
-              <button className="sf-control-btn" onClick={togglePlay}>
-                {isPlaying ? <Pause size={28} fill="white" /> : <Play size={28} fill="white" />}
+              {/* Skip Backward 10s */}
+              <button 
+                className="sf-control-btn sf-skip-btn" 
+                title="Voltar 10s"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const video = videoRef.current;
+                  if (video) {
+                    if (isTranscoded) {
+                      const currentAbsTime = transcodeOffsetRef.current + video.currentTime;
+                      seekToAbsoluteTime(Math.max(0, currentAbsTime - 10));
+                    } else {
+                      video.currentTime = Math.max(0, video.currentTime - 10);
+                    }
+                    triggerFlash('rewind');
+                  }
+                }}
+              >
+                <RotateCcw size={20} />
+              </button>
+
+              {/* Play / Pause Toggle */}
+              <button className="sf-control-btn sf-play-btn" onClick={togglePlay}>
+                {isPlaying ? <Pause size={30} fill="white" /> : <Play size={30} fill="white" />}
+              </button>
+
+              {/* Skip Forward 10s */}
+              <button 
+                className="sf-control-btn sf-skip-btn" 
+                title="Avançar 10s"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const video = videoRef.current;
+                  if (video) {
+                    if (isTranscoded) {
+                      const currentAbsTime = transcodeOffsetRef.current + video.currentTime;
+                      seekToAbsoluteTime(Math.min(duration, currentAbsTime + 10));
+                    } else {
+                      video.currentTime = Math.min(duration, video.currentTime + 10);
+                    }
+                    triggerFlash('forward');
+                  }
+                }}
+              >
+                <RotateCw size={20} />
               </button>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* Volume Reveal Container */}
+              <div className="sf-volume-container">
                 <button className="sf-control-btn" onClick={() => setIsMuted(!isMuted)}>
                   {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
                 </button>
                 <input 
                   type="range" 
-                  min="0" max="1" step="0.1" 
-                  value={volume} 
+                  min="0" max="1" step="0.05" 
+                  value={isMuted ? 0 : volume} 
                   onChange={handleVolumeChange}
-                  style={{ width: '80px', accentColor: '#e50914' }}
+                  className="sf-volume-slider"
                 />
               </div>
 

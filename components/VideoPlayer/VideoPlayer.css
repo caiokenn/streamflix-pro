@@ -1,10 +1,12 @@
-/* STREAMFLIX PRO PLAYER - DESIGN SYSTEM */
+/* STREAMFLIX PRO PLAYER - ULTRA PREMIUM DESIGN SYSTEM */
 :root {
   --player-primary: #e50914;
-  --player-accent: #007bff;
-  --player-bg: #000;
-  --glass-bg: rgba(0, 0, 0, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  --player-primary-glow: rgba(229, 9, 20, 0.45);
+  --player-primary-hover: #ff1f2a;
+  --player-bg: #050505;
+  --glass-bg: rgba(10, 10, 10, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --panel-glow: 0 12px 45px rgba(0, 0, 0, 0.9), 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .sf-player-container {
@@ -18,6 +20,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  user-select: none;
 }
 
 .sf-video-element {
@@ -32,21 +35,22 @@
   inset: 0;
   background-size: cover;
   background-position: center;
-  filter: blur(20px) brightness(0.4);
-  transform: scale(1.1);
+  filter: blur(25px) brightness(0.3);
+  transform: scale(1.15);
   z-index: 0;
+  transition: all 0.5s ease;
 }
 
-/* Overlay de Controles */
+/* Overlay de Controles Cinematográficos */
 .sf-controls-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.8) 100%);
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.8) 100%);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
   z-index: 10;
 }
 
@@ -58,117 +62,158 @@
   cursor: none;
 }
 
-
 /* Top Bar */
 .sf-top-bar {
-  padding: 20px 40px;
+  padding: 30px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
 }
 
 .sf-back-button {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  padding: 10px;
+  padding: 12px;
   border-radius: 50%;
   color: white;
   cursor: pointer;
-  transition: all 0.2s;
-  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .sf-back-button:hover {
   background: var(--player-primary);
-  transform: scale(1.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.12);
+  box-shadow: 0 0 20px var(--player-primary-glow);
 }
 
 .sf-title-info {
   text-align: right;
   color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
 
 .sf-title-info h2 {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
-/* Center Play Button (Large) */
+.sf-title-info p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+/* Center Play Button (Large & Pulsing on Pause) */
 .sf-center-play {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  width: 80px;
-  height: 80px;
+  background: rgba(10, 10, 10, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  width: 85px;
+  height: 85px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
   z-index: 15;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: var(--panel-glow);
 }
 
 .sf-center-play:hover {
   background: var(--player-primary);
+  border-color: rgba(255, 255, 255, 0.25);
   transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: 0 0 35px rgba(229, 9, 20, 0.5), var(--panel-glow);
 }
 
 /* Bottom Bar */
 .sf-bottom-bar {
-  padding: 20px 40px;
+  padding: 30px 40px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
 }
 
-/* Seek Bar */
+/* Seek Bar Container (Estilo Premium) */
 .sf-seek-container {
   width: 100%;
-  height: 6px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 3px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
   position: relative;
   cursor: pointer;
-  transition: height 0.2s;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  display: flex;
+  align-items: center;
 }
 
 .sf-seek-container:hover {
   height: 8px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.sf-seek-progress {
+/* Barra de Buffer Pré-carregado */
+.sf-seek-buffered {
+  position: absolute;
+  left: 0;
+  top: 0;
   height: 100%;
-  background: var(--player-primary);
-  border-radius: 3px;
-  position: relative;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  z-index: 1;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Barra de Progresso Real */
+.sf-seek-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--player-primary) 0%, var(--player-primary-hover) 100%);
+  border-radius: 4px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.3);
+}
+
+/* Marcador/Handle do Seek */
 .sf-seek-handle {
   position: absolute;
   right: -6px;
-  top: 50%;
-  transform: translateY(-50%);
   width: 14px;
   height: 14px;
-  background: white;
+  background: #ffffff;
+  border: 3.5px solid var(--player-primary);
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
-  opacity: 0;
-  transition: opacity 0.2s;
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
+  transform: scale(0);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 3;
 }
 
 .sf-seek-container:hover .sf-seek-handle {
-  opacity: 1;
+  transform: scale(1.1);
 }
 
-/* Main Controls */
+/* Main Controls Layout */
 .sf-main-controls {
   display: flex;
   justify-content: space-between;
@@ -178,50 +223,170 @@
 .sf-controls-left, .sf-controls-right {
   display: flex;
   align-items: center;
-  gap: 25px;
+  gap: 20px;
 }
 
 .sf-control-btn {
   background: transparent;
   border: none;
-  color: white;
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  opacity: 0.8;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sf-control-btn:hover {
-  opacity: 1;
-  transform: scale(1.1);
+  color: white;
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
 }
 
-/* Stats (Peers/Speed) */
+.sf-control-btn.active {
+  color: var(--player-primary);
+  filter: drop-shadow(0 0 8px var(--player-primary-glow));
+}
+
+/* Play/Pause Control Buttons Custom */
+.sf-play-btn {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sf-play-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Skip 10s Backward / Forward Buttons Custom */
+.sf-skip-btn {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.sf-skip-btn:hover {
+  color: white;
+}
+
+/* Volume Slider Slide-Out Reveal System */
+.sf-volume-container {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 8px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sf-volume-container:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.sf-volume-slider {
+  width: 0px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  margin-left: 0;
+  accent-color: var(--player-primary);
+  height: 4px;
+  cursor: pointer;
+}
+
+.sf-volume-container:hover .sf-volume-slider,
+.sf-volume-slider:hover,
+.sf-volume-slider:focus {
+  width: 80px;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 10px;
+}
+
+/* Stats Badges */
 .sf-stats-badge {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  padding: 4px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.8);
-  backdrop-filter: blur(5px);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
 .sf-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #4ade80; /* Green */
-  box-shadow: 0 0 5px #4ade80;
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
 }
 
-/* Loading State */
+/* Indicador Central de Ações (Action Flash overlay) */
+.sf-flash-indicator-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 25;
+  animation: flashFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sf-flash-bubble {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  width: 85px;
+  height: 85px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: var(--panel-glow), inset 0 0 10px rgba(255, 255, 255, 0.05);
+}
+
+.sf-flash-text {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+@keyframes flashFade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Loading Overlay & Cinematic Ken-burns Zoom */
 .sf-loading-overlay {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: #030303;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -230,7 +395,7 @@
   overflow: hidden;
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.8s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .sf-loading-overlay.sf-hidden {
@@ -244,10 +409,16 @@
   inset: 0;
   background-size: cover;
   background-position: center;
-  opacity: 0.35;
-  filter: blur(12px) brightness(0.6);
-  transform: scale(1.1);
+  opacity: 0.4;
+  filter: blur(15px) brightness(0.4);
+  transform: scale(1.05);
   z-index: 0;
+  animation: sf-kenburns 30s infinite alternate ease-in-out;
+}
+
+@keyframes sf-kenburns {
+  0% { transform: scale(1.05) translate(0, 0); }
+  100% { transform: scale(1.15) translate(-1%, -1%); }
 }
 
 .sf-loading-content {
@@ -259,57 +430,78 @@
 }
 
 .sf-loading-logo {
-  font-size: 3.5rem;
+  font-size: 3.8rem;
   font-weight: 900;
-  margin-bottom: 2.5rem;
+  margin-bottom: 0px;
   letter-spacing: -2px;
-  animation: slideDownFade 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  text-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  animation: slideDownFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
 }
 
-.sf-loading-logo span:first-child {
-  text-shadow: 0 0 20px rgba(229, 9, 20, 0.6), 0 0 40px rgba(229, 9, 20, 0.2);
+.sf-logo-stream {
+  color: var(--player-primary);
+  text-shadow: 0 0 20px var(--player-primary-glow), 0 0 40px var(--player-primary-glow);
+}
+
+.sf-logo-flix {
+  color: #ffffff;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.15);
 }
 
 .sf-pulse-logo {
-  animation: logoPulseGlow 1.5s ease-in-out infinite alternate;
+  animation: logoPulseGlow 1.6s ease-in-out infinite alternate;
 }
 
 @keyframes logoPulseGlow {
   0% {
-    opacity: 0.7;
-    transform: scale(0.98);
-    text-shadow: 0 5px 15px rgba(0,0,0,0.8);
+    opacity: 0.75;
+    transform: scale(0.97);
   }
   100% {
     opacity: 1;
-    transform: scale(1.02);
-    text-shadow: 0 10px 40px rgba(229, 9, 20, 0.4), 0 0 20px rgba(229, 9, 20, 0.2);
+    transform: scale(1.03);
   }
+}
+
+/* Elegant circular loading spinner */
+.sf-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(255, 255, 255, 0.04);
+  border-top: 3px solid var(--player-primary);
+  border-radius: 50%;
+  animation: sf-spin 1.1s cubic-bezier(0.5, 0.1, 0.1, 0.9) infinite;
+  margin-top: 30px;
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.35);
+}
+
+@keyframes sf-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .sf-loading-stats-badge {
   position: absolute;
-  bottom: 30px;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 6px 14px;
+  bottom: 40px;
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  padding: 8px 18px;
   border-radius: 100px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
   z-index: 10;
-  animation: slideUpFade 0.8s ease forwards;
-  animation-delay: 0.5s;
-  opacity: 0;
+  animation: slideUpFade 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -320,13 +512,15 @@
   top: 0;
   bottom: 0;
   width: 350px;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(20px);
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   border-left: 1px solid var(--glass-border);
   z-index: 100;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease-out;
+  animation: slideIn 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.7);
 }
 
 @keyframes slideIn {
@@ -335,25 +529,35 @@
 }
 
 .sf-sidebar-header {
-  padding: 30px;
+  padding: 25px 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sf-sidebar-header h3 {
   margin: 0;
   color: white;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
 }
 
 .sf-sidebar-header button {
   background: transparent;
   border: none;
-  color: white;
-  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.8rem;
   cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.sf-sidebar-header button:hover {
+  color: white;
+  transform: rotate(90deg);
 }
 
 .sf-episodes-list {
@@ -362,65 +566,79 @@
   padding: 20px;
 }
 
-.sf-episode-item {
-  padding: 15px 20px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.05);
+.sf-episodes-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sf-episodes-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 10px;
+}
+
+.sf-episode-item {
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 15px;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  border-left: 3px solid transparent;
+  border-top: 1px solid rgba(255, 255, 255, 0.01);
 }
 
 .sf-episode-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(-5px);
+  background: rgba(255, 255, 255, 0.08);
+  border-left-color: rgba(255, 255, 255, 0.3);
+  transform: translateX(-4px);
 }
 
 .sf-episode-item.active {
-  background: var(--player-primary);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(90deg, rgba(229, 9, 20, 0.15) 0%, rgba(229, 9, 20, 0.03) 100%);
+  border-left-color: var(--player-primary);
+  box-shadow: inset 5px 0 15px rgba(229, 9, 20, 0.15);
 }
 
 .sf-ep-num {
   font-weight: 800;
-  font-size: 1.1rem;
-  opacity: 0.8;
+  font-size: 1rem;
+  color: var(--player-primary);
   min-width: 25px;
 }
 
 .sf-ep-title {
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: #efefef;
   white-space: nowrap;
   overflow: hidden;
-  text-anchor: middle;
   text-overflow: ellipsis;
 }
-/* Subtitles Modern Panel */
+
+/* Subtitles Premium Glassmorphic Modern Panel */
 .sf-modern-panel {
   position: absolute;
   bottom: calc(100% + 20px);
   right: 0;
   width: 320px;
-  background: rgba(20, 20, 20, 0.95);
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 15, 15, 0.85);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  box-shadow: var(--panel-glow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideUp 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   z-index: 9999;
 }
 
 .sf-panel-header {
   display: flex;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -430,11 +648,13 @@
   border: none;
   color: rgba(255, 255, 255, 0.5);
   padding: 14px 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2.5px solid transparent;
 }
 
 .sf-panel-header button:hover {
@@ -453,11 +673,11 @@
 }
 
 .sf-panel-content::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .sf-panel-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 10px;
 }
 
@@ -469,23 +689,28 @@
 }
 
 .sf-sub-option {
-  padding: 10px 15px;
+  padding: 11px 16px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.95rem;
-  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
   transition: all 0.2s;
   display: flex;
   align-items: center;
+  border: 1px solid transparent;
 }
 
 .sf-sub-option:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
 }
 
 .sf-sub-option.active {
-  background: var(--player-primary);
-  font-weight: 600;
+  background: linear-gradient(90deg, rgba(229, 9, 20, 0.2) 0%, rgba(229, 9, 20, 0.04) 100%);
+  border-color: rgba(229, 9, 20, 0.3);
+  color: white;
+  font-weight: 700;
 }
 
 /* Subs Settings */
@@ -497,12 +722,12 @@
 
 .sf-setting-group label {
   display: block;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sf-setting-options {
@@ -512,25 +737,27 @@
 
 .sf-setting-options button {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.75);
   padding: 8px 0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .sf-setting-options button:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
 .sf-setting-options button.active {
-  background: rgba(229, 9, 20, 0.2);
-  border-color: var(--player-primary);
-  color: var(--player-primary);
-  font-weight: 600;
+  background: var(--player-primary);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-weight: 700;
 }
 
 .sf-setting-colors {
@@ -544,22 +771,22 @@
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .sf-setting-colors button:hover {
-  transform: scale(1.15);
+  transform: scale(1.18);
 }
 
 .sf-setting-colors button.active {
   border-color: white;
-  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.5);
-  transform: scale(1.15);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 12px rgba(255,255,255,0.6);
+  transform: scale(1.18);
 }
 
 .sf-subs-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .sf-subs-sync {
@@ -569,10 +796,10 @@
 }
 
 .sf-sync-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 700;
   letter-spacing: 1px;
 }
 
@@ -580,9 +807,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   padding: 6px;
   border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sf-sync-controls button {
@@ -597,29 +825,67 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .sf-sync-controls button:hover {
-  background: #ff0a16;
-  transform: scale(1.05);
+  background: var(--player-primary-hover);
+  transform: scale(1.08);
 }
 
 .sf-sync-value {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: white;
   min-width: 50px;
   text-align: center;
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.sf-control-btn.active {
-  color: var(--player-primary);
+/* Subtitle Container Style - Direct Child of Seeker Container */
+.sf-subtitle-overlay {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 20;
+  pointer-events: none;
+  max-width: 80%;
+  width: max-content;
+  display: flex;
+  justify-content: center;
+  transition: bottom 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  animation: subtitleFadeIn 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.sf-subtitle-text {
+  display: inline-block;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 8px;
+  line-height: 1.5;
+  white-space: pre-line;
+  text-align: center;
+  text-shadow: 
+    -1.5px -1.5px 0 #000,  
+     1.5px -1.5px 0 #000,
+    -1.5px  1.5px 0 #000,
+     1.5px  1.5px 0 #000,
+     0px  2px 5px rgba(0,0,0,0.9),
+     0px  4px 15px rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@keyframes subtitleFadeIn {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* Custom Native Subtitle Overrides */
@@ -639,16 +905,16 @@
   
   .sf-bottom-bar {
     padding: 15px 20px;
-    gap: 10px;
+    gap: 12px;
   }
 
   .sf-title-info h2 {
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
 
   .sf-center-play {
-    width: 60px;
-    height: 60px;
+    width: 65px;
+    height: 65px;
   }
 
   .sf-controls-left, .sf-controls-right {
@@ -656,8 +922,8 @@
   }
 
   .sf-control-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
   }
 
   .sf-episodes-sidebar {
@@ -672,11 +938,11 @@
   }
 
   .sf-stats-badge {
-    display: none; /* Hide advanced stats on mobile to save space */
+    display: none;
   }
 
   .sf-loading-logo {
-    font-size: 2.5rem;
+    font-size: 2.8rem;
   }
 }
 
@@ -690,8 +956,8 @@
   }
   
   .sf-control-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
   }
   
   .sf-controls-left, .sf-controls-right {
