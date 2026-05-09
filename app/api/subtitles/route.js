@@ -15,49 +15,16 @@ export async function GET(request) {
       return new NextResponse('Failed to fetch subtitle', { status: response.status });
     }
 
-    // Ler como ArrayBuffer para preservar o encoding original
-    const buffer = await response.arrayBuffer();
-    
-    let decoded = '';
-    try {
-      // 1. Tentar decodificar como UTF-8 estrito primeiro
-      decoded = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
-    } catch {
-      try {
-        // 2. Se falhar (caracteres inválidos para UTF-8), decodificar como Windows-1252 (padrão PT-BR antigo)
-        decoded = new TextDecoder('windows-1252').decode(buffer);
-      } catch {
-        // Fallback de segurança final
-        decoded = new TextDecoder('utf-8').decode(buffer);
-      }
-    }
+    // Os arquivos já vêm convertidos para UTF-8 pelo CDN do Stremio (subencoding-stremio-utf8)
+    // Usa conversão simples e direta SRT → VTT — exatamente como funcionava antes
+    const content = await response.text();
+    let vttContent = content;
 
-    // Conversão SRT → VTT com máxima robustez
-    let vttContent = decoded;
-    if (!decoded.trim().startsWith('WEBVTT')) {
+    if (!content.trim().startsWith('WEBVTT')) {
       // Remove BOM se houver
-      const clean = decoded.replace(/^\uFEFF/, '');
-      
-      // Converte linha por linha para tratar variações de formatação nos timestamps
-      const lines = clean.split('\n');
-      const processedLines = lines.map(line => {
-        if (line.includes('-->')) {
-          // Converte vírgulas de milissegundos para pontos (SRT -> VTT)
-          let processed = line.replace(/,/g, '.');
-          
-          // Corrige timestamps SRT que podem vir com horas de 1 dígito (ex: 0:12:34.567 -> 00:12:34.567)
-          processed = processed.replace(/(?:^|\s)(\d):(\d{2}):(\d{2})\.(\d{3})/g, ' 0$1:$2:$3.$4');
-          return processed;
-        }
-        return line;
-      });
-      
-      vttContent = 'WEBVTT\n\n' + processedLines.join('\n')
-        // Remove tags de formatação SRT que VTT não suporta nativamente
-        .replace(/<font[^>]*>/gi, '').replace(/<\/font>/gi, '')
-        .replace(/<b>/gi, '<b>').replace(/<\/b>/gi, '</b>')
-        .replace(/<i>/gi, '<i>').replace(/<\/i>/gi, '</i>')
-        .replace(/<u>/gi, '<u>').replace(/<\/u>/gi, '</u>');
+      const clean = content.replace(/^\uFEFF/, '');
+      // Converte timestamps: vírgula → ponto  (SRT → VTT)
+      vttContent = 'WEBVTT\n\n' + clean.replace(/(\d{1,2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
     }
 
     return new NextResponse(vttContent, {

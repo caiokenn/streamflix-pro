@@ -166,22 +166,11 @@ export default function WatchPage({ params: paramsPromise }) {
         console.log(`Legendas brutas encontradas (${subs.length}):`, subs);
         
         if (subs.length > 0) {
-          // Score: prefere não-HI (m != 'i'), depois pelo score de grupo (g) descendente
-          const scored = subs.map(s => ({
-            ...s,
-            _score: (parseInt(s.g) || 0),
-            _isHI: s.m === 'i'
-          }));
-
-          // Ordena: não-HI > HI, depois por score desc
-          scored.sort((a, b) => {
-            if (a._isHI !== b._isHI) return a._isHI ? 1 : -1;
-            return b._score - a._score;
-          });
-
+          // A API do Stremio já retorna em ordem de relevância para o IMDB ID dado.
+          // NÃO reordenar por "g" — isso destrói o ranking de sincronia do Stremio.
           const LANG_LABELS = {
-            por: 'Português (Portugal)',
-            pob: 'Português (Brasil)',
+            por: 'Português (PT)',
+            pob: 'Português (BR)',
             pt:  'Português',
             eng: 'Inglês',
             en:  'Inglês',
@@ -193,21 +182,22 @@ export default function WatchPage({ params: paramsPromise }) {
 
           const normalizeLang = (l) => {
             const lower = (l || '').toLowerCase();
-            if (lower.includes('pob')) return 'pt';
-            if (lower.includes('por')) return 'pt';
-            if (lower.includes('pt'))  return 'pt';
-            if (lower.includes('eng') || lower.includes('en')) return 'en';
-            if (lower.includes('spa') || lower.includes('es')) return 'es';
-            if (lower.includes('fre') || lower.includes('fra')) return 'fr';
+            if (lower === 'pob' || lower === 'pb') return 'pt';
+            if (lower === 'por' || lower === 'pt') return 'pt';
+            if (lower.startsWith('eng') || lower === 'en') return 'en';
+            if (lower.startsWith('spa') || lower === 'es') return 'es';
+            if (lower.startsWith('fre') || lower.startsWith('fra')) return 'fr';
             return lower.substring(0, 3);
           };
 
-          // Mantém até 3 versões por idioma (para usuário trocar se a 1ª dessincronizar)
+          // Mantém até 3 versões por idioma na ordem original da API
           const MAX_PER_LANG = 3;
           const countByLang = {};
-          const formattedSubs = [];
+          const ptSubs = [];
+          const enSubs = [];
+          const otherSubs = [];
 
-          for (const s of scored) {
+          for (const s of subs) {
             const lang = normalizeLang(s.lang);
             countByLang[lang] = (countByLang[lang] || 0) + 1;
             if (countByLang[lang] > MAX_PER_LANG) continue;
@@ -216,28 +206,20 @@ export default function WatchPage({ params: paramsPromise }) {
                              LANG_LABELS[normalizeLang(s.lang)] ||
                              (s.lang || 'Outro').toUpperCase();
             const version = countByLang[lang];
-            const hiTag = s._isHI ? ' [SDH]' : '';
-            const label = version === 1 ? `${rawLabel}${hiTag}` : `${rawLabel} v${version}${hiTag}`;
+            const label = version === 1 ? rawLabel : `${rawLabel} v${version}`;
 
-            formattedSubs.push({
-              url: s.url,
-              lang,
-              label,
-              score: s._score,
-              isHI: s._isHI,
-            });
+            const entry = { url: s.url, lang, label };
+
+            if (lang === 'pt') ptSubs.push(entry);
+            else if (lang === 'en') enSubs.push(entry);
+            else otherSubs.push(entry);
           }
 
+          // PT primeiro, EN segundo, resto depois — dentro de cada grupo mantém ordem da API
+          const formattedSubs = [...ptSubs, ...enSubs, ...otherSubs];
+
           if (formattedSubs.length > 0) {
-            // Coloca Português (Brasil / PT) primeiro
-            formattedSubs.sort((a, b) => {
-              const ptA = a.lang === 'pt' ? 0 : (a.lang === 'en' ? 1 : 2);
-              const ptB = b.lang === 'pt' ? 0 : (b.lang === 'en' ? 1 : 2);
-              if (ptA !== ptB) return ptA - ptB;
-              // Dentro do mesmo idioma, mantém a ordem por score (já ordenado)
-              return 0;
-            });
-            console.log('[SUBS] Formatadas e ordenadas:', formattedSubs.map(s => s.label));
+            console.log('[SUBS] Selecionadas:', formattedSubs.map(s => s.label));
             setSubtitles(formattedSubs);
             return;
           }
@@ -245,6 +227,7 @@ export default function WatchPage({ params: paramsPromise }) {
       } catch (err) {
         console.error(`Erro ao buscar legendas via proxy:`, err);
       }
+
       
       setSubtitles([]);
     };

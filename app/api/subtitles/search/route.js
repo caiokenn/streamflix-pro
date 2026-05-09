@@ -12,7 +12,8 @@ export async function GET(request) {
   try {
     const providers = [
       `https://opensubtitles-v3.strem.io/subtitles/${type}/${id}.json`,
-      `https://opensubtitles.strem.io/subtitles/${type}/${id}.json`
+      `https://opensubtitles.strem.io/subtitles/${type}/${id}.json`,
+      `https://opensubtitles-v3.strem.fun/subtitles/${type}/${id}.json`,
     ];
 
     for (const url of providers) {
