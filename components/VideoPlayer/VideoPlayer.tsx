@@ -194,20 +194,25 @@ const VideoPlayer: React.FC<Props> = ({
       .catch(e => console.error('[SUBS] Erro ao carregar:', e.message));
   }, [activeSubtitle, subtitles]);
 
+  // Ref para o subDelay atual — evita re-criação do loop RAF quando só o delay muda
+  const subDelayRef = useRef<number>(0);
+  useEffect(() => { subDelayRef.current = subDelay; }, [subDelay]);
+
   // Sincroniza o texto da legenda com o currentTime do vídeo
   const syncSubtitleToTime = useCallback((currentTime: number) => {
-    const t = currentTime + subDelay;
+    const t = currentTime + subDelayRef.current;
     const cue = parsedCues.current.find(c => t >= c.start && t <= c.end);
     const newText = cue ? cue.text : '';
     
     // Só atualiza o estado se o texto realmente mudou, evitando re-renders desnecessários a 60fps!
     setCurrentSubText(prev => prev !== newText ? newText : prev);
-  }, [subDelay]);
+  }, []);
 
   // Loop de alta precisão (requestAnimationFrame) para sincronização instantânea das legendas (60fps)
+  // Roda sempre que há uma legenda ativa — independente de estar pausado (delay pode mudar em pausa)
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !isPlaying || activeSubtitle === null) return;
+    if (!video || activeSubtitle === null) return;
 
     let active = true;
     let frameId: number;
@@ -227,7 +232,7 @@ const VideoPlayer: React.FC<Props> = ({
       active = false;
       cancelAnimationFrame(frameId);
     };
-  }, [isPlaying, activeSubtitle, syncSubtitleToTime]);
+  }, [activeSubtitle, syncSubtitleToTime]);
 
 
   const formatSpeed = (bytes: number) => {
@@ -512,6 +517,20 @@ const VideoPlayer: React.FC<Props> = ({
         case 'f':
           e.preventDefault();
           toggleFullscreen();
+          break;
+        // Atalhos de sincronia de legenda: [ atrasa, ] adianta
+        case '[':
+          e.preventDefault();
+          setSubDelay(d => Math.max(-30, parseFloat((d - 0.5).toFixed(1))));
+          break;
+        case ']':
+          e.preventDefault();
+          setSubDelay(d => Math.min(30, parseFloat((d + 0.5).toFixed(1))));
+          break;
+        case '\\':
+          // Reseta o delay da legenda
+          e.preventDefault();
+          setSubDelay(0);
           break;
         default:
           break;
@@ -1090,12 +1109,81 @@ const VideoPlayer: React.FC<Props> = ({
 
                           <div className="sf-subs-divider" style={{ margin: '15px 0 10px 0' }}></div>
                           <div className="sf-subs-sync">
-                            <span className="sf-sync-label">Sincronia</span>
-                            <div className="sf-sync-controls">
-                              <button onClick={(e) => { e.stopPropagation(); setSubDelay(d => d - 0.5); }}>-0.5s</button>
-                              <span className="sf-sync-value">{subDelay > 0 ? '+' : ''}{subDelay}s</span>
-                              <button onClick={(e) => { e.stopPropagation(); setSubDelay(d => d + 0.5); }}>+0.5s</button>
+                            <span className="sf-sync-label">
+                              Sincronia
+                              <span style={{ fontSize: '10px', color: '#888', marginLeft: '6px' }}>[ ] ou \ para reset</span>
+                            </span>
+                            {/* Barra visual de delay */}
+                            <div style={{
+                              height: '4px',
+                              borderRadius: '2px',
+                              background: 'rgba(255,255,255,0.1)',
+                              margin: '8px 0 4px',
+                              position: 'relative',
+                              overflow: 'visible',
+                            }}>
+                              <div style={{
+                                position: 'absolute',
+                                top: '-2px',
+                                left: `${Math.min(Math.max(((subDelay + 30) / 60) * 100, 0), 100)}%`,
+                                transform: 'translateX(-50%)',
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: subDelay === 0 ? '#4ade80' : (subDelay > 0 ? '#f5c518' : '#e50914'),
+                                transition: 'left 0.15s, background 0.2s',
+                                boxShadow: `0 0 6px ${subDelay === 0 ? '#4ade80' : (subDelay > 0 ? '#f5c518' : '#e50914')}`,
+                              }} />
                             </div>
+                            {/* Controles de delay: fino (0.1s) e grosso (1s) */}
+                            <div className="sf-sync-controls" style={{ gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              <button
+                                title="-1 segundo"
+                                style={{ fontSize: '11px', padding: '3px 7px', opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.max(-30, parseFloat((d - 1).toFixed(1)))); }}
+                              >-1s</button>
+                              <button
+                                title="-0.5 segundo"
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.max(-30, parseFloat((d - 0.5).toFixed(1)))); }}
+                              >-0.5s</button>
+                              <button
+                                title="-0.1 segundo"
+                                style={{ fontSize: '11px', padding: '3px 7px', opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.max(-30, parseFloat((d - 0.1).toFixed(1)))); }}
+                              >-0.1s</button>
+                              <button
+                                title="Resetar sincronia"
+                                style={{
+                                  fontSize: '10px',
+                                  padding: '3px 8px',
+                                  background: subDelay !== 0 ? 'rgba(229,9,20,0.3)' : 'rgba(255,255,255,0.08)',
+                                  fontWeight: subDelay !== 0 ? 700 : 400,
+                                  color: subDelay !== 0 ? '#fff' : '#aaa',
+                                }}
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(0); }}
+                              >↺ reset</button>
+                              <button
+                                title="+0.1 segundo"
+                                style={{ fontSize: '11px', padding: '3px 7px', opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.min(30, parseFloat((d + 0.1).toFixed(1)))); }}
+                              >+0.1s</button>
+                              <button
+                                title="+0.5 segundo"
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.min(30, parseFloat((d + 0.5).toFixed(1)))); }}
+                              >+0.5s</button>
+                              <button
+                                title="+1 segundo"
+                                style={{ fontSize: '11px', padding: '3px 7px', opacity: 0.8 }}
+                                onClick={(e) => { e.stopPropagation(); setSubDelay(d => Math.min(30, parseFloat((d + 1).toFixed(1)))); }}
+                              >+1s</button>
+                            </div>
+                            <span className="sf-sync-value" style={{ marginTop: '6px', display: 'block', textAlign: 'center',
+                              color: subDelay === 0 ? '#4ade80' : (subDelay > 0 ? '#f5c518' : '#e50914'),
+                              fontWeight: 700,
+                              fontSize: '14px'
+                            }}>
+                              {subDelay > 0 ? '+' : ''}{subDelay.toFixed(1)}s
+                            </span>
                           </div>
                         </div>
                       )}

@@ -166,25 +166,78 @@ export default function WatchPage({ params: paramsPromise }) {
         console.log(`Legendas brutas encontradas (${subs.length}):`, subs);
         
         if (subs.length > 0) {
-          const formattedSubs = subs.map(s => {
-            const l = (s.lang || '').toLowerCase();
-            const isPt = l.includes('por') || l.includes('pob') || l.includes('pt');
-            const isEng = l.includes('eng') || l.includes('en');
-            
-            return {
-              url: s.url,
-              lang: isPt ? 'pt' : (isEng ? 'en' : l.substring(0, 3)),
-              label: isPt ? 'Português' : (isEng ? 'Inglês' : s.lang || 'Outro')
-            };
+          // Score: prefere não-HI (m != 'i'), depois pelo score de grupo (g) descendente
+          const scored = subs.map(s => ({
+            ...s,
+            _score: (parseInt(s.g) || 0),
+            _isHI: s.m === 'i'
+          }));
+
+          // Ordena: não-HI > HI, depois por score desc
+          scored.sort((a, b) => {
+            if (a._isHI !== b._isHI) return a._isHI ? 1 : -1;
+            return b._score - a._score;
           });
-            
+
+          const LANG_LABELS = {
+            por: 'Português (Portugal)',
+            pob: 'Português (Brasil)',
+            pt:  'Português',
+            eng: 'Inglês',
+            en:  'Inglês',
+            spa: 'Espanhol',
+            es:  'Espanhol',
+            fre: 'Francês',
+            fra: 'Francês',
+          };
+
+          const normalizeLang = (l) => {
+            const lower = (l || '').toLowerCase();
+            if (lower.includes('pob')) return 'pt';
+            if (lower.includes('por')) return 'pt';
+            if (lower.includes('pt'))  return 'pt';
+            if (lower.includes('eng') || lower.includes('en')) return 'en';
+            if (lower.includes('spa') || lower.includes('es')) return 'es';
+            if (lower.includes('fre') || lower.includes('fra')) return 'fr';
+            return lower.substring(0, 3);
+          };
+
+          // Mantém até 3 versões por idioma (para usuário trocar se a 1ª dessincronizar)
+          const MAX_PER_LANG = 3;
+          const countByLang = {};
+          const formattedSubs = [];
+
+          for (const s of scored) {
+            const lang = normalizeLang(s.lang);
+            countByLang[lang] = (countByLang[lang] || 0) + 1;
+            if (countByLang[lang] > MAX_PER_LANG) continue;
+
+            const rawLabel = LANG_LABELS[s.lang?.toLowerCase()] ||
+                             LANG_LABELS[normalizeLang(s.lang)] ||
+                             (s.lang || 'Outro').toUpperCase();
+            const version = countByLang[lang];
+            const hiTag = s._isHI ? ' [SDH]' : '';
+            const label = version === 1 ? `${rawLabel}${hiTag}` : `${rawLabel} v${version}${hiTag}`;
+
+            formattedSubs.push({
+              url: s.url,
+              lang,
+              label,
+              score: s._score,
+              isHI: s._isHI,
+            });
+          }
+
           if (formattedSubs.length > 0) {
-            // Sort to put Portuguese first
+            // Coloca Português (Brasil / PT) primeiro
             formattedSubs.sort((a, b) => {
-              if (a.lang === 'pt' && b.lang !== 'pt') return -1;
-              if (a.lang !== 'pt' && b.lang === 'pt') return 1;
+              const ptA = a.lang === 'pt' ? 0 : (a.lang === 'en' ? 1 : 2);
+              const ptB = b.lang === 'pt' ? 0 : (b.lang === 'en' ? 1 : 2);
+              if (ptA !== ptB) return ptA - ptB;
+              // Dentro do mesmo idioma, mantém a ordem por score (já ordenado)
               return 0;
             });
+            console.log('[SUBS] Formatadas e ordenadas:', formattedSubs.map(s => s.label));
             setSubtitles(formattedSubs);
             return;
           }
